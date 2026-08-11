@@ -89,6 +89,8 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
     role: l.role,
   });
 
+  const commentaryEntries = (match.commentary ?? []) as { id: number; minute: number; text: string }[];
+
   const initialData = {
     status: match.status,
     round: match.round,
@@ -114,8 +116,8 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
     isPaused: Boolean(match.timerPausedAt),
     additionalTimeFirstHalf: match.additionalTimeFirstHalf,
     additionalTimeSecondHalf: match.additionalTimeSecondHalf,
-    isExtraTime: match.isExtraTime,
-    isPenaltyShootout: match.isPenaltyShootout,
+    isExtraTime: Boolean(match.isExtraTime),
+    isPenaltyShootout: Boolean(match.isPenaltyShootout),
     stats: {
       possession: [match.homePossession ?? 50, match.awayPossession ?? 50] as [number, number],
       shots: [match.homeShots, match.awayShots] as [number, number],
@@ -142,7 +144,7 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
       assistPlayer: e.assistPlayer ? `${e.assistPlayer.firstName} ${e.assistPlayer.lastName}` : null,
       outPlayer: e.outPlayer ? `${e.outPlayer.firstName} ${e.outPlayer.lastName}` : null,
     })),
-    commentary: match.commentary.map((c) => ({ id: c.id, minute: c.minute, text: c.text })),
+    commentary: commentaryEntries.map((c) => ({ id: c.id, minute: c.minute, text: c.text })),
     lineups: {
       home: {
         starters: homeLineups.filter((l) => l.role === "starter").map(mapLineup),
