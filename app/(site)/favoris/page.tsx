@@ -69,6 +69,7 @@ function FavoritesContent() {
   );
 }
 
+
 export default function FavoritesPage() {
   return (
     <Suspense fallback={<p className="mx-auto max-w-3xl px-4 py-8 text-sm text-gray-400">Chargement…</p>}>
