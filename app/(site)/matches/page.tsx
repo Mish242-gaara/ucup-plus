@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { getElapsedSeconds, currentMinute } from "@/lib/elapsed-time";
 import LiveFeed from "@/components/LiveFeed";
+import { MatchStatus } from "@prisma/client";
 
 const matchInclude = {
   homeTeam: { include: { university: true } },
@@ -17,11 +18,11 @@ export default async function MatchesPage({
 
   const statusFilter =
     validFilter === "live"
-      ? { in: ["live", "halftime"] as const }
+      ? { in: ["live", "halftime"] as MatchStatus[] }
       : validFilter === "finished"
-        ? { in: ["finished"] as const }
+        ? { in: ["finished"] as MatchStatus[] }
         : validFilter === "upcoming"
-          ? { in: ["scheduled"] as const }
+          ? { in: ["scheduled"] as MatchStatus[] }
           : undefined;
 
   const matches = await prisma.match.findMany({
