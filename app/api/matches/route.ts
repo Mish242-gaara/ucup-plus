@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getElapsedSeconds, currentMinute } from "@/lib/elapsed-time";
+import { MatchStatus } from "@prisma/client";
 
 // GET /api/matches?status=live&group=A
 export async function GET(req: NextRequest) {
@@ -10,7 +11,11 @@ export async function GET(req: NextRequest) {
 
   const matches = await prisma.match.findMany({
     where: {
-      ...(status === "live" ? { status: { in: ["live", "halftime"] } } : status ? { status: status as any } : {}),
+      ...(status === "live"
+        ? { status: { in: ["live", "halftime"] as MatchStatus[] } }
+        : status
+        ? { status: status as MatchStatus }
+        : {}),
       ...(group ? { group } : {}),
     },
     include: {
