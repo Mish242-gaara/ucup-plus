@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 
+// Force le rendu dynamique sur le serveur pour éviter les erreurs de pré-rendu statique lors du build
+export const dynamic = "force-dynamic";
+
 export default async function LeaderboardPage() {
   const [topScorers, topAssists, mostCarded] = await Promise.all([
     prisma.player.findMany({
