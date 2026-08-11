@@ -2,6 +2,10 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import TeamLogo from "@/components/TeamLogo";
 
+// Force le rendu dynamique pour éviter les erreurs de pré-rendu statique lors du build
+export const dynamic = "force-dynamic";
+
+
 export default async function PlayersPage() {
   const players = await prisma.player.findMany({
     where: { status: "approved" },

@@ -1,6 +1,10 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 
+// Force le rendu dynamique pour éviter les erreurs de pré-rendu statique lors du build
+export const dynamic = "force-dynamic";
+
+
 export const metadata = { title: "Actualités — UCUP 2026" };
 
 export default async function NewsPage() {

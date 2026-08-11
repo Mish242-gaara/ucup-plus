@@ -2,6 +2,8 @@ import { Shield, Shirt, CalendarDays, Goal } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import TeamsExplorer from "@/components/TeamsExplorer";
 
+export const dynamic = "force-dynamic";
+
 export const metadata = { title: "Équipes — UCUP 2026" };
 
 export default async function TeamsPage() {

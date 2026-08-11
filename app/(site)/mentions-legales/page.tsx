@@ -1,5 +1,5 @@
 export const metadata = { title: "Mentions légales & confidentialité — UCUP 2026" };
-
+export const dynamic = "force-dynamic";
 export default function MentionsLegalesPage() {
   return (
     <main className="mx-auto max-w-2xl px-4 py-10">

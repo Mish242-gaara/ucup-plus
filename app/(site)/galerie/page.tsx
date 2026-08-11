@@ -1,6 +1,9 @@
 import { Play } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 
+// Force le rendu dynamique pour éviter les erreurs de pré-rendu statique lors du build
+export const dynamic = "force-dynamic";
+
 function toEmbedUrl(url: string) {
   const youtube = url.match(/(?:youtu\.be\/|youtube\.com\/watch\?v=)([\w-]+)/);
   if (youtube) return `https://www.youtube.com/embed/${youtube[1]}`;
