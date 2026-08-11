@@ -7,6 +7,9 @@ import { useFavorites } from "@/lib/hooks/useFavorites";
 import MatchCard from "@/components/MatchCard";
 import PushNotificationToggle from "@/components/PushNotificationToggle";
 
+// Désactive la génération statique lors du 'next build' pour éviter l'erreur de Suspense
+export const dynamic = "force-dynamic";
+
 type ApiMatch = {
   id: number;
   status: string;
@@ -68,7 +71,6 @@ function FavoritesContent() {
     </main>
   );
 }
-
 
 export default function FavoritesPage() {
   return (
