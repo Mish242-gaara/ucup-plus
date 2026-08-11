@@ -5,6 +5,8 @@ import FeaturedMatchCard from "@/components/FeaturedMatchCard";
 import TopScorersWidget from "@/components/TopScorersWidget";
 import StandingsWidget from "@/components/StandingsWidget";
 
+export const dynamic = "force-dynamic";
+
 export default async function HomePage() {
   const matches = await prisma.match.findMany({
     where: { status: { in: ["live", "halftime", "scheduled"] } },
