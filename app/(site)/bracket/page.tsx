@@ -1,6 +1,9 @@
 import { prisma } from "@/lib/prisma";
 import Bracket from "@/components/Bracket";
 
+// Force le rendu dynamique pour éviter les erreurs de pré-rendu statique lors du build
+export const dynamic = "force-dynamic";
+
 export default async function BracketPage() {
   const matches = await prisma.match.findMany({
     where: { bracketRound: { not: null } },
