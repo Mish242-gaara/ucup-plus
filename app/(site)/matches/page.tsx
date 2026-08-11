@@ -3,6 +3,9 @@ import { getElapsedSeconds, currentMinute } from "@/lib/elapsed-time";
 import LiveFeed from "@/components/LiveFeed";
 import { MatchStatus } from "@prisma/client";
 
+// Force le rendu dynamique pour éviter les erreurs de pré-rendu statique avec searchParams
+export const dynamic = "force-dynamic";
+
 const matchInclude = {
   homeTeam: { include: { university: true } },
   awayTeam: { include: { university: true } },
