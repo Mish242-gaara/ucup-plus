@@ -1,0 +1,27 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+  /* --- Admin (dark) form controls --- */
+  .input {
+    @apply rounded-md border border-white/10 bg-zinc-800 px-3 py-2 text-sm text-white placeholder:text-gray-500 focus:border-brand-400 focus:outline-none;
+  }
+  .btn {
+    @apply rounded-md bg-brand-500 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-600;
+  }
+  .admin-card {
+    @apply rounded-xl border border-white/10 bg-zinc-900;
+  }
+
+  /* --- Public site pill-shaped controls --- */
+  .site-input {
+    @apply rounded-full border border-gray-200 bg-white px-4 py-2 text-sm text-ink placeholder:text-gray-400 focus:border-brand-400 focus:outline-none;
+  }
+  .site-btn {
+    @apply rounded-full bg-brand-500 px-5 py-2 text-sm font-bold uppercase tracking-wide text-white transition hover:bg-brand-600;
+  }
+  .site-card {
+    @apply rounded-xl bg-white shadow-card;
+  }
+}

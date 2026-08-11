@@ -1,0 +1,464 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// =========================================================
+// AUTH
+// =========================================================
+
+model User {
+  id                     Int       @id @default(autoincrement())
+  name                   String
+  email                  String    @unique
+  emailVerifiedAt        DateTime? @map("email_verified_at")
+  password               String
+  isAdmin                Boolean   @default(false) @map("is_admin")
+  themePreference        String    @default("system") @map("theme_preference")
+  twoFactorSecret        String?   @map("two_factor_secret")
+  twoFactorRecoveryCodes String?   @map("two_factor_recovery_codes")
+  twoFactorConfirmedAt   DateTime? @map("two_factor_confirmed_at")
+  createdAt              DateTime  @default(now()) @map("created_at")
+  updatedAt              DateTime  @updatedAt @map("updated_at")
+
+  @@map("users")
+}
+
+// =========================================================
+// CORE ENTITIES
+// =========================================================
+
+model University {
+  id          Int      @id @default(autoincrement())
+  name        String
+  shortName   String   @map("short_name")
+  logo        String?
+  colors      String?
+  city        String?
+  foundedYear Int?     @map("founded_year")
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  teams Team[]
+
+  @@map("universities")
+}
+
+model Team {
+  id           Int      @id @default(autoincrement())
+  universityId Int      @map("university_id")
+  name         String
+  coach        String?
+  captainId    Int?     @map("captain_id") @unique
+  category     String   @default("senior")
+  year         Int
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  university University @relation(fields: [universityId], references: [id], onDelete: Cascade)
+  captain    Player?    @relation("TeamCaptain", fields: [captainId], references: [id], onDelete: SetNull)
+  players    Player[]   @relation("TeamPlayers")
+
+  homeMatches Match[] @relation("HomeTeam")
+  awayMatches Match[] @relation("AwayTeam")
+
+  matchEvents  MatchEvent[]
+  standings    Standing[]
+  matchLineups MatchLineup[]
+  newsArticles NewsArticle[]
+  lineups      Lineup[]
+
+  @@map("teams")
+}
+
+enum PlayerStatus {
+  pending
+  approved
+  rejected
+
+  @@map("player_status")
+}
+
+model Player {
+  id             Int      @id @default(autoincrement())
+  teamId         Int      @map("team_id")
+  firstName      String   @map("first_name")
+  lastName       String   @map("last_name")
+  jerseyNumber   Int      @map("jersey_number")
+  position       String
+  birthDate      DateTime? @map("birth_date")
+  height         Int?
+  photo          String?
+  photoPath      String?  @map("photo_path")
+  nationality    String   @default("DRC")
+  status         PlayerStatus @default(approved)
+
+  // Denormalized career stats
+  goals            Int @default(0)
+  assists          Int @default(0)
+  yellowCards      Int @default(0) @map("yellow_cards")
+  redCards         Int @default(0) @map("red_cards")
+  matchesPlayed    Int @default(0) @map("matches_played")
+  minutesPlayed    Int @default(0) @map("minutes_played")
+  passesCompleted  Int @default(0) @map("passes_completed")
+  passAccuracy     Int @default(0) @map("pass_accuracy")
+  tackles          Int @default(0)
+  interceptions    Int @default(0)
+  foulsCommitted   Int @default(0) @map("fouls_committed")
+  foulsSuffered    Int @default(0) @map("fouls_suffered")
+  shotsOnTarget    Int @default(0) @map("shots_on_target")
+  dribbles         Int @default(0)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  team Team @relation("TeamPlayers", fields: [teamId], references: [id], onDelete: Cascade)
+  captainOfTeam Team? @relation("TeamCaptain")
+
+  eventsAsPlayer      MatchEvent[]  @relation("EventPlayer")
+  eventsAsAssist      MatchEvent[]  @relation("EventAssist")
+  eventsAsOutPlayer   MatchEvent[]  @relation("EventOutPlayer")
+  matchLineups        MatchLineup[]
+  lineups             Lineup[]
+
+  @@map("players")
+}
+
+// =========================================================
+// MATCHES
+// =========================================================
+
+enum MatchStatus {
+  scheduled
+  live
+  halftime
+  finished
+  postponed
+
+  @@map("match_status")
+}
+
+enum MatchType {
+  tournament
+  friendly
+
+  @@map("match_type")
+}
+
+model Match {
+  id           Int         @id @default(autoincrement())
+  homeTeamId   Int         @map("home_team_id")
+  awayTeamId   Int         @map("away_team_id")
+  matchDate    DateTime    @map("match_date")
+  venue        String?
+  status       MatchStatus @default(scheduled)
+
+  homeScore Int @default(0) @map("home_score")
+  awayScore Int @default(0) @map("away_score")
+
+  homeCoach String? @map("home_coach")
+  awayCoach String? @map("away_coach")
+
+  homeFormation String? @map("home_formation")
+  awayFormation String? @map("away_formation")
+
+  homeCompositionReady Boolean @default(false) @map("home_composition_ready")
+  awayCompositionReady Boolean @default(false) @map("away_composition_ready")
+
+  round      String?
+  bracketRound    Int? @map("bracket_round") // 1 = premier tour, 2 = suivant, etc. — ordonne les colonnes du bracket
+  bracketPosition Int? @map("bracket_position") // position verticale dans la colonne (0-indexé)
+  group      String?
+  matchType  MatchType? @default(tournament) @map("match_type")
+  attendance Int?
+
+  startTime     DateTime? @map("start_time")
+  timerPausedAt DateTime? @map("timer_paused_at")
+
+  elapsedTime               Int?     @default(0) @map("elapsed_time")
+  additionalTimeFirstHalf   Int?     @default(0) @map("additional_time_first_half")
+  additionalTimeSecondHalf  Int?     @default(0) @map("additional_time_second_half")
+  isExtraTime               Boolean? @default(false) @map("is_extra_time")
+  isPenaltyShootout         Boolean? @default(false) @map("is_penalty_shootout")
+
+  // Aggregated / manual stats
+  homeFouls    Int @default(0) @map("home_fouls")
+  homeCorners  Int @default(0) @map("home_corners")
+  homeOffsides Int @default(0) @map("home_offsides")
+  awayFouls    Int @default(0) @map("away_fouls")
+  awayCorners  Int @default(0) @map("away_corners")
+  awayOffsides Int @default(0) @map("away_offsides")
+
+  homeYellowCards Int @default(0) @map("home_yellow_cards")
+  homeRedCards    Int @default(0) @map("home_red_cards")
+  awayYellowCards Int @default(0) @map("away_yellow_cards")
+  awayRedCards    Int @default(0) @map("away_red_cards")
+
+  homePossession Int? @map("home_possession")
+  awayPossession Int? @map("away_possession")
+
+  homeShots          Int @default(0) @map("home_shots")
+  awayShots          Int @default(0) @map("away_shots")
+  homeShotsOnTarget  Int? @default(0) @map("home_shots_on_target")
+  awayShotsOnTarget  Int? @default(0) @map("away_shots_on_target")
+
+  homeSaves     Int @default(0) @map("home_saves")
+  awaySaves     Int @default(0) @map("away_saves")
+  homeFreeKicks Int @default(0) @map("home_free_kicks")
+  awayFreeKicks Int @default(0) @map("away_free_kicks")
+  homeThrowIns  Int @default(0) @map("home_throw_ins")
+  awayThrowIns  Int @default(0) @map("away_throw_ins")
+  homeGoalkicks Int @default(0) @map("home_goalkicks")
+  awayGoalkicks Int @default(0) @map("away_goalkicks")
+  homePenalties Int @default(0) @map("home_penalties")
+  awayPenalties Int @default(0) @map("away_penalties")
+
+  referee     String?
+  weather     String?
+  temperature Int?
+  humidity    Int?
+  adminNotes  String? @map("admin_notes")
+  matchReport String? @map("match_report")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  homeTeam Team @relation("HomeTeam", fields: [homeTeamId], references: [id], onDelete: Cascade)
+  awayTeam Team @relation("AwayTeam", fields: [awayTeamId], references: [id], onDelete: Cascade)
+
+  events       MatchEvent[]
+  commentary   MatchCommentary[]
+  matchLineups MatchLineup[]
+  lineups      Lineup[]
+
+  @@map("matches")
+}
+
+enum MatchEventType {
+  goal
+  penalty_goal
+  own_goal
+  yellow_card
+  second_yellow
+  red_card
+  substitution
+  substitution_in
+  substitution_out
+  injury
+  penalty_missed
+  big_chance_missed
+
+  @@map("match_event_type")
+}
+
+model MatchEvent {
+  id              Int            @id @default(autoincrement())
+  matchId         Int            @map("match_id")
+  teamId          Int            @map("team_id")
+  playerId        Int            @map("player_id")
+  assistPlayerId  Int?           @map("assist_player_id")
+  outPlayerId     Int?           @map("out_player_id")
+  eventType       MatchEventType @map("event_type")
+  minute          Int
+  additionalTime  String?        @map("additional_time")
+  description     String?
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+
+  match        Match   @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  team         Team    @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  player       Player  @relation("EventPlayer", fields: [playerId], references: [id], onDelete: Cascade)
+  assistPlayer Player? @relation("EventAssist", fields: [assistPlayerId], references: [id], onDelete: SetNull)
+  outPlayer    Player? @relation("EventOutPlayer", fields: [outPlayerId], references: [id], onDelete: SetNull)
+
+  @@map("match_events")
+}
+
+model PushSubscription {
+  id        Int      @id @default(autoincrement())
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  teamIds   Int[]    @map("team_ids") // teams this browser wants push alerts for
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("push_subscriptions")
+}
+
+model MatchCommentary {
+  id        Int      @id @default(autoincrement())
+  matchId   Int      @map("match_id")
+  minute    Int
+  text      String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  match Match @relation(fields: [matchId], references: [id], onDelete: Cascade)
+
+  @@map("match_commentary")
+}
+
+// =========================================================
+// LINEUPS (two parallel tables, mirrored from Laravel as-is)
+// =========================================================
+
+enum LineupRole {
+  starter
+  substitute
+
+  @@map("lineup_role")
+}
+
+model MatchLineup {
+  id                Int         @id @default(autoincrement())
+  matchId           Int         @map("match_id")
+  teamId            Int         @map("team_id")
+  playerId          Int         @map("player_id")
+  role              LineupRole
+  startingPosition  String?     @map("starting_position")
+  orderKey          Int?        @map("order_key")
+  isStarter         Boolean     @default(false) @map("is_starter")
+  position          String?
+  createdAt         DateTime    @default(now()) @map("created_at")
+  updatedAt         DateTime    @updatedAt @map("updated_at")
+
+  match  Match  @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  team   Team   @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@unique([matchId, playerId])
+  @@map("match_lineups")
+}
+
+model Lineup {
+  id            Int      @id @default(autoincrement())
+  matchId       Int      @map("match_id")
+  teamId        Int      @map("team_id")
+  playerId      Int      @map("player_id")
+  role          String? // 'starter' | 'bench'
+  matchPosition String?  @map("match_position") // tactical position e.g. DC, MOC, BU
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  match  Match  @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  team   Team   @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@unique([matchId, playerId])
+  @@map("lineups")
+}
+
+// =========================================================
+// STANDINGS
+// =========================================================
+
+model Standing {
+  id              Int      @id @default(autoincrement())
+  teamId          Int      @map("team_id")
+  group           String?
+  played          Int      @default(0)
+  won             Int      @default(0)
+  drawn           Int      @default(0)
+  lost            Int      @default(0)
+  goalsFor        Int      @default(0) @map("goals_for")
+  goalsAgainst    Int      @default(0) @map("goals_against")
+  goalDifference  Int      @default(0) @map("goal_difference")
+  points          Int      @default(0)
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, group])
+  @@map("standings")
+}
+
+model AuditLog {
+  id         Int      @id @default(autoincrement())
+  actorEmail String   @map("actor_email")
+  action     String
+  entityType String   @map("entity_type")
+  entityId   Int?     @map("entity_id")
+  detail     String?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([entityType, entityId])
+  @@map("audit_logs")
+}
+
+model RateLimitAttempt {
+  id        Int      @id @default(autoincrement())
+  key       String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([key, createdAt])
+  @@map("rate_limit_attempts")
+}
+
+// =========================================================
+// GALLERY
+// =========================================================
+
+enum MediaType {
+  image
+  video
+
+  @@map("media_type")
+}
+
+model GalleryItem {
+  id          Int       @id @default(autoincrement())
+  title       String?
+  description String?
+  filePath    String    @map("file_path")
+  mediaType   MediaType @map("media_type")
+  sortOrder   Int       @default(0) @map("sort_order")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@map("gallery_items")
+}
+
+// =========================================================
+// NEWS
+// =========================================================
+
+model NewsArticle {
+  id          Int       @id @default(autoincrement())
+  title       String
+  slug        String    @unique
+  excerpt     String?
+  content     String
+  coverImage  String?   @map("cover_image")
+  teamId      Int?      @map("team_id") // null = actualité générale UCUP 2026
+  published   Boolean   @default(false)
+  publishedAt DateTime? @map("published_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  team Team? @relation(fields: [teamId], references: [id], onDelete: SetNull)
+
+  @@map("news_articles")
+}
+
+// =========================================================
+// SPONSORS
+// =========================================================
+
+model Sponsor {
+  id         Int      @id @default(autoincrement())
+  name       String
+  logo       String
+  websiteUrl String?  @map("website_url")
+  sortOrder  Int      @default(0) @map("sort_order")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@map("sponsors")
+}

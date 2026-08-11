@@ -1,0 +1,9 @@
+{
+  "/api/matches/[id]/live/route": "app/api/matches/[id]/live/route.js",
+  "/inscription-joueur/page": "app/inscription-joueur/page.js",
+  "/admin/players/page": "app/admin/players/page.js",
+  "/(site)/matches/page": "app/(site)/matches/page.js",
+  "/(site)/players/page": "app/(site)/players/page.js",
+  "/(site)/players/[id]/page": "app/(site)/players/[id]/page.js",
+  "/(site)/matches/[id]/page": "app/(site)/matches/[id]/page.js"
+}
