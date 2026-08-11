@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import Link from "next/link";
 import { Star } from "lucide-react";
 import { useFavorites } from "@/lib/hooks/useFavorites";
@@ -20,7 +20,7 @@ type ApiMatch = {
   awayTeam: { name: string; university: { logo: string | null } };
 };
 
-export default function FavoritesPage() {
+function FavoritesContent() {
   const { favoriteIds } = useFavorites();
   const [matches, setMatches] = useState<ApiMatch[] | null>(null);
 
@@ -66,5 +66,13 @@ export default function FavoritesPage() {
         </div>
       )}
     </main>
+  );
+}
+
+export default function FavoritesPage() {
+  return (
+    <Suspense fallback={<p className="mx-auto max-w-3xl px-4 py-8 text-sm text-gray-400">Chargement…</p>}>
+      <FavoritesContent />
+    </Suspense>
   );
 }
