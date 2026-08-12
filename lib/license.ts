@@ -1,13 +1,11 @@
-import { createCanvas, loadImage, type SKRSContext2D, type Canvas } from "@napi-rs/canvas";
+import { createCanvas, loadImage, GlobalFonts, type SKRSContext2D, type Canvas } from "@napi-rs/canvas";
 
-// Physical size target: 900x1260px @ ~300dpi ≈ 76x107mm — a standard
-// badge/student-card format, printable directly.
 export const CARD_WIDTH = 900;
 export const CARD_HEIGHT = 1260;
 
-const NAVY = "#0b1f3f";
-const RED = "#d51f2a";
-const RED_DARK = "#94121d";
+const NAVY = "#0B1B3D";
+const RED = "#D51F2A";
+const TEXT_DARK = "#1E293B";
 
 export type LicenseData = {
   firstName: string;
@@ -27,13 +25,39 @@ export type LicenseData = {
   issuedDate: string;
 };
 
+// Chargement et enregistrement de la police Inter pour l'environnement Serverless Linux (Vercel)
+let fontsLoaded = false;
+async function ensureFonts() {
+  if (fontsLoaded) return;
+  try {
+    const [boldRes, regRes] = await Promise.all([
+      fetch("https://cdn.jsdelivr.net/fontsource/fonts/inter@latest/latin-700-normal.ttf"),
+      fetch("https://cdn.jsdelivr.net/fontsource/fonts/inter@latest/latin-400-normal.ttf"),
+    ]);
+
+    if (boldRes.ok && regRes.ok) {
+      const [boldBuffer, regBuffer] = await Promise.all([
+        boldRes.arrayBuffer(),
+        regRes.arrayBuffer(),
+      ]);
+      GlobalFonts.register(Buffer.from(boldBuffer), "InterBold");
+      GlobalFonts.register(Buffer.from(regBuffer), "InterRegular");
+      fontsLoaded = true;
+    }
+  } catch (e) {
+    console.error("Erreur de chargement des polices :", e);
+  }
+}
+
+const font = (size: number, weight: "bold" | "regular" = "bold") =>
+  `${weight === "bold" ? "700" : "400"} ${size}px ${fontsLoaded ? (weight === "bold" ? "InterBold" : "InterRegular") : "sans-serif"}`;
+
 async function safeLoadImage(url: string | null) {
   if (!url) return null;
   try {
     const res = await fetch(url);
     if (!res.ok) return null;
-    const buffer = Buffer.from(await res.arrayBuffer());
-    return await loadImage(buffer);
+    return await loadImage(Buffer.from(await res.arrayBuffer()));
   } catch {
     return null;
   }
@@ -49,148 +73,134 @@ function roundRect(ctx: SKRSContext2D, x: number, y: number, w: number, h: numbe
   ctx.closePath();
 }
 
-function drawDiagonalAccent(ctx: SKRSContext2D, headerHeight: number) {
-  ctx.fillStyle = RED;
-  ctx.beginPath();
-  ctx.moveTo(0, headerHeight);
-  ctx.lineTo(160, headerHeight);
-  ctx.lineTo(0, headerHeight - 90);
-  ctx.closePath();
-  ctx.fill();
-}
-
-function wrapText(ctx: SKRSContext2D, text: string, x: number, y: number, maxWidth: number, lineHeight: number) {
-  const words = text.split(" ");
-  let line = "";
-  let cursorY = y;
-
-  for (const word of words) {
-    const test = line ? `${line} ${word}` : word;
-    if (ctx.measureText(test).width > maxWidth && line) {
-      ctx.fillText(line, x, cursorY);
-      line = word;
-      cursorY += lineHeight;
-    } else {
-      line = test;
-    }
-  }
-  if (line) ctx.fillText(line, x, cursorY);
-  return cursorY + lineHeight;
-}
-
-function drawFallbackTournamentLogo(ctx: SKRSContext2D, cx: number, cy: number, r: number) {
+// Dessin des icônes vectorielles pour les lignes d'information
+function drawRowIcon(ctx: SKRSContext2D, type: string, cx: number, cy: number) {
   ctx.save();
+  ctx.fillStyle = NAVY;
   ctx.beginPath();
-  ctx.arc(cx, cy, r, 0, Math.PI * 2);
-  ctx.fillStyle = "rgba(255,255,255,0.12)";
+  ctx.arc(cx, cy, 18, 0, Math.PI * 2);
   ctx.fill();
+
   ctx.strokeStyle = "white";
-  ctx.lineWidth = 3;
-  ctx.stroke();
   ctx.fillStyle = "white";
-  ctx.font = `bold ${Math.round(r * 0.9)}px sans-serif`;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText("UCUP", cx, cy + 2);
+  ctx.lineWidth = 2;
+
+  if (type === "user") {
+    ctx.beginPath();
+    ctx.arc(cx, cy - 4, 5, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(cx, cy + 12, 10, Math.PI, 0);
+    ctx.stroke();
+  } else if (type === "run") {
+    ctx.beginPath();
+    ctx.arc(cx + 2, cy - 7, 3.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(cx - 5, cy - 1); ctx.lineTo(cx + 3, cy - 2); ctx.lineTo(cx + 7, cy + 4);
+    ctx.moveTo(cx - 2, cy + 3); ctx.lineTo(cx - 6, cy + 10);
+    ctx.moveTo(cx + 2, cy + 4); ctx.lineTo(cx + 5, cy + 11);
+    ctx.stroke();
+  } else if (type === "uni") {
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - 9); ctx.lineTo(cx - 10, cy - 3); ctx.lineTo(cx + 10, cy - 3); ctx.closePath();
+    ctx.fill();
+    ctx.fillRect(cx - 8, cy - 1, 3, 7);
+    ctx.fillRect(cx - 1.5, cy - 1, 3, 7);
+    ctx.fillRect(cx + 5, cy - 1, 3, 7);
+    ctx.fillRect(cx - 10, cy + 7, 20, 2);
+  } else if (type === "card") {
+    roundRect(ctx, cx - 9, cy - 6, 18, 12, 2);
+    ctx.stroke();
+    ctx.fillRect(cx - 6, cy - 2, 6, 2);
+  } else if (type === "team") {
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - 9); ctx.lineTo(cx + 8, cy - 5); ctx.lineTo(cx + 6, cy + 5); ctx.lineTo(cx, cy + 9); ctx.lineTo(cx - 6, cy + 5); ctx.lineTo(cx - 8, cy - 5); ctx.closePath();
+    ctx.stroke();
+  } else if (type === "cal") {
+    roundRect(ctx, cx - 8, cy - 7, 16, 14, 2);
+    ctx.stroke();
+    ctx.fillRect(cx - 8, cy - 3, 16, 2);
+  }
   ctx.restore();
 }
 
-async function drawInfoRow(
-  ctx: SKRSContext2D,
-  x: number,
-  y: number,
-  label: string,
-  value: string,
-  labelColor: string
-) {
-  ctx.fillStyle = NAVY;
-  ctx.beginPath();
-  ctx.arc(x + 18, y, 18, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.fillStyle = labelColor;
-  ctx.font = "bold 20px sans-serif";
-  ctx.textAlign = "left";
-  ctx.textBaseline = "alphabetic";
-  ctx.fillText(label, x + 50, y + 6);
-
-  ctx.fillStyle = "#111111";
-  ctx.font = "bold 24px sans-serif";
-  ctx.fillText(value, x + 300, y + 7);
-
-  ctx.strokeStyle = "#e5e5e5";
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(x, y + 26);
-  ctx.lineTo(x + CARD_WIDTH - 2 * x, y + 26);
-  ctx.stroke();
-}
-
+// =========================================================
+// RECTO DE LA LICENCE
+// =========================================================
 export async function renderLicenseFront(data: LicenseData): Promise<Canvas> {
+  await ensureFonts();
   const canvas = createCanvas(CARD_WIDTH, CARD_HEIGHT);
   const ctx = canvas.getContext("2d");
 
-  ctx.fillStyle = "#f4f5f7";
+  // Fond clair
+  ctx.fillStyle = "#F8FAFC";
   ctx.fillRect(0, 0, CARD_WIDTH, CARD_HEIGHT);
 
-  const headerHeight = 230;
+  // En-tête bleu nuit
   ctx.fillStyle = NAVY;
-  ctx.fillRect(0, 0, CARD_WIDTH, headerHeight);
-  drawDiagonalAccent(ctx, headerHeight);
+  ctx.fillRect(0, 0, CARD_WIDTH, 200);
 
+  // Forme rouge diagonale en haut à gauche
+  ctx.fillStyle = RED;
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.lineTo(150, 0);
+  ctx.lineTo(0, 200);
+  ctx.closePath();
+  ctx.fill();
+
+  // Logo UCUP (En-tête Gauche)
   const tournamentLogo = await safeLoadImage(data.tournamentLogo);
   if (tournamentLogo) {
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(110, 115, 70, 0, Math.PI * 2);
-    ctx.clip();
-    ctx.drawImage(tournamentLogo, 40, 45, 140, 140);
-    ctx.restore();
+    ctx.drawImage(tournamentLogo, 35, 25, 90, 90);
   } else {
-    drawFallbackTournamentLogo(ctx, 110, 115, 70);
+    ctx.fillStyle = "white";
+    ctx.font = font(22);
+    ctx.fillText("UCUP", 55, 75);
   }
-
-  ctx.strokeStyle = "rgba(255,255,255,0.4)";
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(200, 55);
-  ctx.lineTo(200, 175);
-  ctx.stroke();
-
   ctx.fillStyle = "white";
-  ctx.textAlign = "left";
-  ctx.font = "bold 34px sans-serif";
-  ctx.fillText("LICENCE DE JOUEUR", 225, 90);
-  ctx.font = "bold 15px sans-serif";
-  ctx.fillStyle = "rgba(255,255,255,0.85)";
-  ctx.fillText("CHAMPIONNAT UNIVERSITAIRE DE FOOTBALL", 225, 118);
-  ctx.font = "13px sans-serif";
-  ctx.fillStyle = "rgba(255,255,255,0.65)";
-  ctx.fillText("POINTE-NOIRE & BRAZZAVILLE", 225, 140);
+  ctx.font = font(14);
+  ctx.textAlign = "center";
+  ctx.fillText("UCUP 2026", 80, 135);
 
+  // Titres En-tête
+  ctx.textAlign = "left";
+  ctx.fillStyle = "white";
+  ctx.font = font(32);
+  ctx.fillText("LICENCE DE JOUEUR", 185, 75);
+  ctx.font = font(14, "regular");
+  ctx.fillStyle = "rgba(255, 255, 255, 0.85)";
+  ctx.fillText("CHAMPIONNAT UNIVERSITAIRE DE FOOTBALL", 185, 105);
+  ctx.font = font(12, "regular");
+  ctx.fillStyle = "rgba(255, 255, 255, 0.65)";
+  ctx.fillText("POINTE-NOIRE & BRAZZAVILLE", 185, 125);
+
+  // Logo Université (En-tête Droite)
   const uniLogo = await safeLoadImage(data.universityLogo);
   ctx.save();
   ctx.beginPath();
-  ctx.arc(CARD_WIDTH - 90, 90, 55, 0, Math.PI * 2);
+  ctx.arc(CARD_WIDTH - 85, 85, 50, 0, Math.PI * 2);
   ctx.fillStyle = "white";
   ctx.fill();
   ctx.clip();
   if (uniLogo) {
-    ctx.drawImage(uniLogo, CARD_WIDTH - 145, 35, 110, 110);
+    ctx.drawImage(uniLogo, CARD_WIDTH - 135, 35, 100, 100);
   } else {
     ctx.fillStyle = NAVY;
-    ctx.font = "bold 22px sans-serif";
+    ctx.font = font(20);
     ctx.textAlign = "center";
-    ctx.fillText(data.universityShortName.slice(0, 3), CARD_WIDTH - 90, 96);
+    ctx.fillText(data.universityShortName.slice(0, 4), CARD_WIDTH - 85, 92);
   }
   ctx.restore();
 
-  const photoBox = { x: 225, y: 260, w: 450, h: 380 };
+  // Photo du joueur
+  const photoBox = { x: (CARD_WIDTH - 420) / 2, y: 180, w: 420, h: 350 };
   ctx.fillStyle = "white";
-  roundRect(ctx, photoBox.x - 6, photoBox.y - 6, photoBox.w + 12, photoBox.h + 12, 10);
+  roundRect(ctx, photoBox.x - 4, photoBox.y - 4, photoBox.w + 8, photoBox.h + 8, 8);
   ctx.fill();
   ctx.strokeStyle = RED;
-  ctx.lineWidth = 4;
+  ctx.lineWidth = 3;
   roundRect(ctx, photoBox.x, photoBox.y, photoBox.w, photoBox.h, 6);
   ctx.stroke();
 
@@ -204,190 +214,282 @@ export async function renderLicenseFront(data: LicenseData): Promise<Canvas> {
     const dh = photo.height * scale;
     ctx.drawImage(photo, photoBox.x + (photoBox.w - dw) / 2, photoBox.y + (photoBox.h - dh) / 2, dw, dh);
   } else {
-    ctx.fillStyle = "#d1d5db";
+    ctx.fillStyle = "#CBD5E1";
     ctx.fillRect(photoBox.x, photoBox.y, photoBox.w, photoBox.h);
-    ctx.fillStyle = "#6b7280";
-    ctx.font = "bold 80px sans-serif";
+    ctx.fillStyle = "#475569";
+    ctx.font = font(70);
     ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(`${data.firstName[0]}${data.lastName[0]}`, photoBox.x + photoBox.w / 2, photoBox.y + photoBox.h / 2);
+    ctx.fillText(`${data.firstName[0] ?? ""}${data.lastName[0] ?? ""}`, photoBox.x + photoBox.w / 2, photoBox.y + photoBox.h / 2 + 25);
   }
   ctx.restore();
 
-  const rows: [string, string][] = [
-    ["NOM(S)", data.lastName.toUpperCase()],
-    ["PRÉNOM(S)", data.firstName],
-    ["POSITION", data.position],
-    ["UNIVERSITÉ", data.universityShortName],
-    ["NUMÉRO LICENCE", data.licenseNumber],
-    ["ÉQUIPE", data.teamName],
-    ["VALIDITÉ", "Saison 2026"],
+  // Lignes d'informations
+  const rows = [
+    { icon: "user", label: "NOM(S)", val: data.lastName.toUpperCase() },
+    { icon: "user", label: "PRÉNOM(S)", val: data.firstName },
+    { icon: "run", label: "POSITION", val: data.position },
+    { icon: "uni", label: "UNIVERSITÉ", val: data.universityShortName },
+    { icon: "card", label: "NUMÉRO LICENCE", val: data.licenseNumber },
+    { icon: "team", label: "ÉQUIPE", val: data.teamName },
+    { icon: "cal", label: "VALIDITÉ", val: "Saison 2026" },
   ];
-  let rowY = 700;
-  for (const [label, value] of rows) {
-    await drawInfoRow(ctx, 60, rowY, label, value, RED_DARK);
-    rowY += 48;
-  }
 
-  const footerY = rowY + 40;
-  ctx.fillStyle = "#111111";
-  ctx.font = "italic 22px sans-serif";
+  let startY = 580;
+  const lineGap = 48;
+
+  rows.forEach((r, idx) => {
+    const y = startY + idx * lineGap;
+    drawRowIcon(ctx, r.icon, 120, y);
+
+    // Label
+    ctx.fillStyle = TEXT_DARK;
+    ctx.font = font(20);
+    ctx.textAlign = "left";
+    ctx.fillText(r.label, 155, y + 7);
+
+    // Deux-points
+    ctx.fillText(":", 380, y + 7);
+
+    // Valeur en ROUGE
+    ctx.fillStyle = RED;
+    ctx.font = font(22);
+    ctx.fillText(r.val, 405, y + 7);
+
+    // Ligne de séparation
+    ctx.strokeStyle = "#E2E8F0";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(100, y + 22);
+    ctx.lineTo(CARD_WIDTH - 100, y + 22);
+    ctx.stroke();
+  });
+
+  // Bas de carte (Signature, QR Code, Tampon)
+  const footerY = 960;
+
+  // Signature (Gauche)
+  ctx.fillStyle = TEXT_DARK;
+  ctx.font = font(14);
   ctx.textAlign = "left";
-  ctx.fillText("Comité d'organisation", 60, footerY);
-  ctx.font = "bold 14px sans-serif";
-  ctx.fillStyle = "#6b7280";
-  ctx.fillText("COMITÉ D'ORGANISATION", 60, footerY + 26);
-  ctx.fillText("UCUP 2026", 60, footerY + 44);
+  ctx.fillText("COMITÉ D'ORGANISATION", 100, footerY + 80);
+  ctx.font = font(12, "regular");
+  ctx.fillText("UCUP 2026", 100, footerY + 98);
 
+  // Traceur de signature fictive
+  ctx.strokeStyle = "#1E293B";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(100, footerY + 45);
+  ctx.bezierCurveTo(130, footerY + 10, 150, footerY + 60, 190, footerY + 30);
+  ctx.stroke();
+
+  // QR Code (Centre)
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(
     `${process.env.NEXT_PUBLIC_SITE_URL ?? ""}/players/verify/${data.licenseNumber}`
   )}`;
   const qrImage = await safeLoadImage(qrUrl);
   if (qrImage) {
-    ctx.drawImage(qrImage, 370, footerY - 65, 130, 130);
+    ctx.drawImage(qrImage, (CARD_WIDTH - 130) / 2, footerY, 130, 130);
   }
 
+  // Tampon rond officiel (Droite)
   ctx.save();
+  ctx.translate(CARD_WIDTH - 160, footerY + 65);
   ctx.beginPath();
-  ctx.arc(770, footerY, 65, 0, Math.PI * 2);
-  ctx.fillStyle = NAVY;
+  ctx.arc(0, 0, 55, 0, Math.PI * 2);
+  ctx.fillStyle = "#E0F2FE";
   ctx.fill();
-  ctx.restore();
-  ctx.fillStyle = "white";
-  ctx.textAlign = "center";
-  ctx.font = "bold 13px sans-serif";
-  ctx.fillText("UCUP", 770, footerY - 6);
-  ctx.fillText("2026", 770, footerY + 12);
+  ctx.strokeStyle = NAVY;
+  ctx.lineWidth = 2;
+  ctx.stroke();
 
   ctx.fillStyle = NAVY;
-  ctx.fillRect(0, CARD_HEIGHT - 40, CARD_WIDTH, 40);
-  ctx.fillStyle = "white";
-  ctx.font = "bold 14px sans-serif";
+  ctx.font = font(12);
   ctx.textAlign = "center";
-  ctx.fillText("LA PASSION UNIVERSITAIRE, NOTRE FORCE", CARD_WIDTH / 2, CARD_HEIGHT - 15);
+  ctx.fillText("UCUP", 0, -5);
+  ctx.fillText("2026", 0, 15);
+  ctx.restore();
+
+  // Bandeau inférieur
+  const botY = CARD_HEIGHT - 50;
+  ctx.fillStyle = NAVY;
+  ctx.fillRect(0, botY, CARD_WIDTH, 50);
+
+  // Angles rouges en bas
+  ctx.fillStyle = RED;
+  ctx.beginPath();
+  ctx.moveTo(0, CARD_HEIGHT); ctx.lineTo(80, CARD_HEIGHT); ctx.lineTo(0, botY); ctx.closePath(); ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(CARD_WIDTH, CARD_HEIGHT); ctx.lineTo(CARD_WIDTH - 80, CARD_HEIGHT); ctx.lineTo(CARD_WIDTH, botY); ctx.closePath(); ctx.fill();
+
+  ctx.fillStyle = "white";
+  ctx.font = font(16);
+  ctx.textAlign = "center";
+  ctx.fillText("LA PASSION UNIVERSITAIRE, NOTRE FORCE", CARD_WIDTH / 2, botY + 30);
 
   return canvas;
 }
 
+// =========================================================
+// VERSO DE LA LICENCE
+// =========================================================
 export async function renderLicenseBack(data: LicenseData): Promise<Canvas> {
+  await ensureFonts();
   const canvas = createCanvas(CARD_WIDTH, CARD_HEIGHT);
   const ctx = canvas.getContext("2d");
 
-  ctx.fillStyle = "#f4f5f7";
+  // Fond clair
+  ctx.fillStyle = "#F8FAFC";
   ctx.fillRect(0, 0, CARD_WIDTH, CARD_HEIGHT);
 
-  const headerHeight = 180;
+  // En-tête bleu nuit
   ctx.fillStyle = NAVY;
-  ctx.fillRect(0, 0, CARD_WIDTH, headerHeight);
-  drawDiagonalAccent(ctx, headerHeight);
+  ctx.fillRect(0, 0, CARD_WIDTH, 180);
 
+  // Triangle rouge à gauche
+  ctx.fillStyle = RED;
+  ctx.beginPath();
+  ctx.moveTo(0, 0); ctx.lineTo(130, 0); ctx.lineTo(0, 180); ctx.closePath(); ctx.fill();
+
+  // Logo UCUP
   const tournamentLogo = await safeLoadImage(data.tournamentLogo);
   if (tournamentLogo) {
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(100, 90, 55, 0, Math.PI * 2);
-    ctx.clip();
-    ctx.drawImage(tournamentLogo, 45, 35, 110, 110);
-    ctx.restore();
-  } else {
-    drawFallbackTournamentLogo(ctx, 100, 90, 55);
+    ctx.drawImage(tournamentLogo, 35, 20, 80, 80);
   }
-
   ctx.fillStyle = "white";
+  ctx.font = font(12);
+  ctx.textAlign = "center";
+  ctx.fillText("UCUP 2026", 75, 118);
+
   ctx.textAlign = "left";
-  ctx.font = "bold 32px sans-serif";
-  ctx.fillText("LICENCE DE JOUEUR", 180, 90);
-  ctx.font = "16px sans-serif";
-  ctx.fillStyle = "rgba(255,255,255,0.8)";
-  ctx.fillText("SAISON 2026", 180, 120);
+  ctx.font = font(32);
+  ctx.fillText("LICENCE DE JOUEUR", 170, 75);
+  ctx.font = font(16, "regular");
+  ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
+  ctx.fillText("SAISON 2026", 170, 110);
 
-  const panelX = 60;
-  const panelY = 220;
-  const panelW = CARD_WIDTH - 120;
-  const panelH = 300;
+  // Carte Conditions
+  const cardX = 60;
+  const cardY = 220;
+  const cardW = CARD_WIDTH - 120;
+  const cardH = 380;
+
   ctx.fillStyle = "white";
-  roundRect(ctx, panelX, panelY, panelW, panelH, 12);
+  roundRect(ctx, cardX, cardY, cardW, cardH, 16);
   ctx.fill();
 
+  // Badge rouge "CONDITIONS D'UTILISATION"
   ctx.fillStyle = RED;
-  roundRect(ctx, panelX + 24, panelY - 18, 300, 44, 22);
+  roundRect(ctx, cardX + 30, cardY + 25, 280, 42, 21);
   ctx.fill();
   ctx.fillStyle = "white";
-  ctx.font = "bold 16px sans-serif";
-  ctx.textAlign = "left";
-  ctx.fillText("CONDITIONS D'UTILISATION", panelX + 44, panelY + 10);
+  ctx.font = font(14);
+  ctx.textAlign = "center";
+  ctx.fillText("CONDITIONS D'UTILISATION", cardX + 170, cardY + 51);
 
-  const conditions = [
+  // Puces des conditions
+  const conds = [
     "Cette licence est strictement personnelle et valable uniquement pour le Championnat Universitaire de Football UCUP 2026.",
     "Elle permet au joueur de participer aux rencontres officielles organisées dans le cadre du tournoi.",
     "Toute utilisation frauduleuse, falsification ou prêt de cette licence entraîne des sanctions disciplinaires.",
     "En cas de perte, veuillez contacter le comité d'organisation.",
   ];
 
-  let condY = panelY + 60;
-  for (const cond of conditions) {
+  let cY = cardY + 105;
+  conds.forEach((text) => {
+    // Icône bouclier rouge
     ctx.fillStyle = RED;
     ctx.beginPath();
-    ctx.arc(panelX + 45, condY, 16, 0, Math.PI * 2);
+    ctx.arc(cardX + 45, cY + 8, 14, 0, Math.PI * 2);
     ctx.fill();
     ctx.fillStyle = "white";
-    ctx.font = "bold 14px sans-serif";
+    ctx.font = font(11);
     ctx.textAlign = "center";
-    ctx.fillText("OK", panelX + 45, condY + 5);
+    ctx.fillText("✓", cardX + 45, cY + 12);
 
-    ctx.fillStyle = "#1f2937";
-    ctx.font = "16px sans-serif";
+    // Texte condition
+    ctx.fillStyle = TEXT_DARK;
+    ctx.font = font(15, "regular");
     ctx.textAlign = "left";
-    condY = wrapText(ctx, cond, panelX + 75, condY - 6, panelW - 110, 22) + 12;
-  }
 
-  let y = panelY + panelH + 60;
-  ctx.fillStyle = RED;
-  ctx.font = "bold 15px sans-serif";
-  ctx.textAlign = "center";
-  ctx.fillText("ORGANISÉ PAR", CARD_WIDTH / 2, y);
-  y += 26;
-  ctx.fillStyle = "#111111";
-  ctx.font = "bold 18px sans-serif";
-  ctx.fillText(data.organizerName, CARD_WIDTH / 2, y);
-  if (data.organizerSub) {
-    y += 24;
-    ctx.fillStyle = "#6b7280";
-    ctx.font = "15px sans-serif";
-    ctx.fillText(data.organizerSub, CARD_WIDTH / 2, y);
-  }
+    // Subdiviser les textes longs
+    const words = text.split(" ");
+    let line = "";
+    let lineY = cY + 12;
+    words.forEach((w) => {
+      const test = line ? `${line} ${w}` : w;
+      if (ctx.measureText(test).width > cardW - 100) {
+        ctx.fillText(line, cardX + 75, lineY);
+        line = w;
+        lineY += 22;
+      } else {
+        line = test;
+      }
+    });
+    if (line) ctx.fillText(line, cardX + 75, lineY);
 
-  y += 40;
-  const blockH = 130;
-  ctx.fillStyle = NAVY;
-  roundRect(ctx, panelX, y, panelW, blockH, 12);
-  ctx.fill();
-
-  const cols: [string, string][] = [
-    ["DATE D'ÉMISSION", data.issuedDate],
-    ["ÉMIS PAR", "Comité d'organisation"],
-    ["VALIDITÉ", "Saison 2026"],
-  ];
-  const colW = panelW / 3;
-  cols.forEach(([label, value], i) => {
-    const cx = panelX + colW * i + colW / 2;
-    ctx.fillStyle = "rgba(255,255,255,0.6)";
-    ctx.font = "bold 12px sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText(label, cx, y + 50);
-    ctx.fillStyle = "white";
-    ctx.font = "bold 16px sans-serif";
-    ctx.fillText(value, cx, y + 78);
+    cY = lineY + 28;
   });
 
-  y += blockH + 30;
+  // Section Organisé Par
+  let orgY = cardY + cardH + 60;
   ctx.fillStyle = RED;
-  roundRect(ctx, panelX, y, panelW, 56, 10);
-  ctx.fill();
-  ctx.fillStyle = "white";
-  ctx.font = "bold 16px sans-serif";
+  ctx.font = font(16);
   ctx.textAlign = "center";
-  ctx.fillText("NON TRANSFÉRABLE – DOCUMENT OFFICIEL DU TOURNOI", CARD_WIDTH / 2, y + 35);
+  ctx.fillText("ORGANISÉ PAR", CARD_WIDTH / 2, orgY);
+
+  ctx.fillStyle = TEXT_DARK;
+  ctx.font = font(18);
+  ctx.fillText(data.organizerName, CARD_WIDTH / 2, orgY + 28);
+  if (data.organizerSub) {
+    ctx.font = font(14, "regular");
+    ctx.fillStyle = "#64748B";
+    ctx.fillText(data.organizerSub, CARD_WIDTH / 2, orgY + 50);
+  }
+
+  // Bloc d'infos bas (Bleu Nuit)
+  const blockY = 820;
+  const blockH = 180;
+  ctx.fillStyle = NAVY;
+  roundRect(ctx, cardX, blockY, cardW, blockH, 16);
+  ctx.fill();
+
+  const cols = [
+    { label: "DATE D'ÉMISSION", val: data.issuedDate },
+    { label: "ÉMIS PAR", val: "Comité d'organisation\nUCUP 2026" },
+    { label: "VALIDITÉ", val: "Saison 2026" },
+  ];
+
+  const colW = cardW / 3;
+  cols.forEach((col, i) => {
+    const cx = cardX + i * colW + colW / 2;
+
+    ctx.fillStyle = "rgba(255, 255, 255, 0.7)";
+    ctx.font = font(13);
+    ctx.textAlign = "center";
+    ctx.fillText(col.label, cx, blockY + 55);
+
+    ctx.fillStyle = "white";
+    ctx.font = font(16);
+    const lines = col.val.split("\n");
+    if (lines.length > 1) {
+      ctx.fillText(lines[0], cx, blockY + 90);
+      ctx.fillText(lines[1], cx, blockY + 112);
+    } else {
+      ctx.fillText(col.val, cx, blockY + 100);
+    }
+  });
+
+  // Pilule d'avertissement rouge en bas
+  const warnY = blockY + blockH + 35;
+  ctx.fillStyle = RED;
+  roundRect(ctx, cardX, warnY, cardW, 60, 12);
+  ctx.fill();
+
+  ctx.fillStyle = "white";
+  ctx.font = font(16);
+  ctx.textAlign = "center";
+  ctx.fillText("⚠  NON TRANSFÉRABLE – DOCUMENT OFFICIEL DU TOURNOI", CARD_WIDTH / 2, warnY + 36);
 
   return canvas;
 }
