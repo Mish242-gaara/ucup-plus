@@ -14,6 +14,7 @@ const NAV = [
   { href: "/admin/sponsors", label: "Sponsors" },
   { href: "/admin/users", label: "Comptes admin" },
   { href: "/admin/audit", label: "Journal d'activité" },
+  { href: "/admin/settings", label: "Réglages du tournoi" },
   { href: "/admin/account/2fa", label: "Sécurité (2FA)" },
 ];
 

@@ -64,11 +64,37 @@ export async function stopTimer(matchId: number) {
   await requireAdmin();
   const match = await prisma.match.findUniqueOrThrow({ where: { id: matchId } });
   const elapsed = getElapsedSeconds(match);
+  const wasAlreadyFinished = match.status === "finished";
 
   await prisma.match.update({
     where: { id: matchId },
     data: { status: "finished", elapsedTime: elapsed, timerPausedAt: new Date() },
   });
+
+  if (!wasAlreadyFinished) {
+    const [lineups, events] = await Promise.all([
+      prisma.matchLineup.findMany({ where: { matchId }, select: { playerId: true } }),
+      prisma.matchEvent.findMany({
+        where: { matchId },
+        select: { playerId: true, assistPlayerId: true, outPlayerId: true },
+      }),
+    ]);
+
+    const involved = new Set<number>();
+    for (const l of lineups) involved.add(l.playerId);
+    for (const e of events) {
+      involved.add(e.playerId);
+      if (e.assistPlayerId) involved.add(e.assistPlayerId);
+      if (e.outPlayerId) involved.add(e.outPlayerId);
+    }
+
+    if (involved.size > 0) {
+      await prisma.player.updateMany({
+        where: { id: { in: Array.from(involved) } },
+        data: { matchesPlayed: { increment: 1 } },
+      });
+    }
+  }
 
   const { recalculateAllStandings } = await import("@/lib/standings");
   await recalculateAllStandings();

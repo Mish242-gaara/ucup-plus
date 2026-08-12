@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { createPlayer, deletePlayer, setPlayerStatus } from "@/lib/actions/players";
 import PhotoUploadField from "@/components/PhotoUploadField";
 import ConfirmButton from "@/components/ConfirmButton";
+import LicenseDownloadMenu from "@/components/LicenseDownloadMenu";
 
 const POSITIONS = ["Gardien", "Défenseur", "Milieu", "Attaquant"];
 
@@ -115,6 +116,7 @@ export default async function PlayersPage() {
                   <Link href={`/admin/players/${p.id}/edit`} className="text-brand-500 hover:underline">
                     Modifier
                   </Link>
+                  <LicenseDownloadMenu playerId={p.id} />
                   {p.status !== "approved" && (
                     <form action={setPlayerStatus.bind(null, p.id, "approved")}>
                       <button className="text-green-600 hover:underline" type="submit">

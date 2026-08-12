@@ -98,6 +98,7 @@ model Player {
   photoPath      String?  @map("photo_path")
   nationality    String   @default("DRC")
   status         PlayerStatus @default(approved)
+  licenseNumber  String?  @unique @map("license_number")
 
   // Denormalized career stats
   goals            Int @default(0)
@@ -445,6 +446,20 @@ model NewsArticle {
   team Team? @relation(fields: [teamId], references: [id], onDelete: SetNull)
 
   @@map("news_articles")
+}
+
+// =========================================================
+// TOURNAMENT SETTINGS (singleton, id is always 1)
+// =========================================================
+
+model TournamentSettings {
+  id            Int      @id @default(1)
+  logo          String?
+  organizerName String?  @default("Comité d'organisation UCUP 2026") @map("organizer_name")
+  organizerSub  String?  @map("organizer_sub")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@map("tournament_settings")
 }
 
 // =========================================================

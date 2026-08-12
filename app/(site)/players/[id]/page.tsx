@@ -38,17 +38,40 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
 
   if (!player || player.status !== "approved") notFound();
 
-  const lineups = await prisma.matchLineup.findMany({
-    where: { playerId },
-    include: {
-      match: { include: { homeTeam: true, awayTeam: true } },
-    },
-    orderBy: { match: { matchDate: "desc" } },
-    take: 10,
-  });
+  // Matches this player took part in: from published lineups AND, as a
+  // fallback, from any match event they're credited with (goal, assist,
+  // sub) — a match without a published composition would otherwise never
+  // show up here even if the player actually scored in it.
+  const [lineups, playerEvents] = await Promise.all([
+    prisma.matchLineup.findMany({
+      where: { playerId },
+      select: { matchId: true, teamId: true, role: true },
+    }),
+    prisma.matchEvent.findMany({
+      where: { OR: [{ playerId }, { assistPlayerId: playerId }] },
+      select: { matchId: true, teamId: true },
+    }),
+  ]);
 
-  const finishedLineups = lineups.filter((l) => l.match.status === "finished");
-  const matchIds = finishedLineups.map((l) => l.matchId);
+  const roleByMatch = new Map(lineups.map((l) => [l.matchId, l.role]));
+  const teamByMatch = new Map<number, number>();
+  for (const l of lineups) teamByMatch.set(l.matchId, l.teamId);
+  for (const e of playerEvents) if (!teamByMatch.has(e.matchId)) teamByMatch.set(e.matchId, e.teamId);
+
+  const involvedMatchIds = Array.from(
+    new Set([...lineups.map((l) => l.matchId), ...playerEvents.map((e) => e.matchId)])
+  );
+
+  const involvedMatches = involvedMatchIds.length
+    ? await prisma.match.findMany({
+        where: { id: { in: involvedMatchIds }, status: "finished" },
+        include: { homeTeam: true, awayTeam: true },
+        orderBy: { matchDate: "desc" },
+        take: 10,
+      })
+    : [];
+
+  const matchIds = involvedMatches.map((m) => m.id);
 
   const events = matchIds.length
     ? await prisma.matchEvent.findMany({
@@ -71,9 +94,9 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
     assistsByMatch.set(e.matchId, (assistsByMatch.get(e.matchId) ?? 0) + 1);
   }
 
-  const history = finishedLineups.map((l) => {
-    const m = l.match;
-    const isHome = m.homeTeamId === l.teamId;
+  const history = involvedMatches.map((m) => {
+    const teamId = teamByMatch.get(m.id);
+    const isHome = teamId ? m.homeTeamId === teamId : true;
     const opponent = isHome ? m.awayTeam.name : m.homeTeam.name;
     const matchEvents = eventsByMatch.get(m.id) ?? [];
     const goals = matchEvents.filter((e) => ["goal", "penalty_goal"].includes(e.eventType)).length;
@@ -86,12 +109,14 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
     const teamResult = teamScore > otherScore ? "win" : teamScore < otherScore ? "loss" : "draw";
     const rating = computeMatchRating({ goals, assists, yellowCards: yellow, redCards: red, teamResult });
 
+    const role = roleByMatch.get(m.id);
+
     return {
       matchId: m.id,
       date: m.matchDate,
       opponent,
       score: `${m.homeScore} - ${m.awayScore}`,
-      role: l.role === "starter" ? "Titulaire" : "Remplaçant",
+      role: role === "starter" ? "Titulaire" : role === "substitute" ? "Remplaçant" : "Participation enregistrée",
       goals,
       yellow,
       red,
