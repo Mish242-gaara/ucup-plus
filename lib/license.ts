@@ -25,7 +25,7 @@ export type LicenseData = {
   issuedDate: string;
 };
 
-// Chargement et enregistrement de la police Inter pour l'environnement Serverless Linux (Vercel)
+// Enregistrement des polices pour le serveur
 let fontsLoaded = false;
 async function ensureFonts() {
   if (fontsLoaded) return;
@@ -73,7 +73,7 @@ function roundRect(ctx: SKRSContext2D, x: number, y: number, w: number, h: numbe
   ctx.closePath();
 }
 
-// Dessin des icônes vectorielles pour les lignes d'information
+// Dessin des icônes vectorielles des champs
 function drawRowIcon(ctx: SKRSContext2D, type: string, cx: number, cy: number) {
   ctx.save();
   ctx.fillStyle = NAVY;
@@ -133,20 +133,35 @@ export async function renderLicenseFront(data: LicenseData): Promise<Canvas> {
   const canvas = createCanvas(CARD_WIDTH, CARD_HEIGHT);
   const ctx = canvas.getContext("2d");
 
-  // Fond clair
+  // 1. Fond général clair
   ctx.fillStyle = "#F8FAFC";
   ctx.fillRect(0, 0, CARD_WIDTH, CARD_HEIGHT);
 
-  // En-tête bleu nuit
+  // 2. En-tête Bleu Nuit avec coupe en diagonale
   ctx.fillStyle = NAVY;
-  ctx.fillRect(0, 0, CARD_WIDTH, 200);
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.lineTo(CARD_WIDTH, 0);
+  ctx.lineTo(CARD_WIDTH, 200);
+  ctx.lineTo(0, 360);
+  ctx.closePath();
+  ctx.fill();
 
-  // Forme rouge diagonale en haut à gauche
+  // 3. Triangle Rouge en haut à gauche
   ctx.fillStyle = RED;
   ctx.beginPath();
   ctx.moveTo(0, 0);
-  ctx.lineTo(150, 0);
-  ctx.lineTo(0, 200);
+  ctx.lineTo(160, 0);
+  ctx.lineTo(0, 220);
+  ctx.closePath();
+  ctx.fill();
+
+  // 4. Polygone Rouge milieu gauche (sous l'en-tête bleu)
+  ctx.fillStyle = RED;
+  ctx.beginPath();
+  ctx.moveTo(0, 360);
+  ctx.lineTo(140, 450);
+  ctx.lineTo(0, 540);
   ctx.closePath();
   ctx.fill();
 
@@ -241,21 +256,16 @@ export async function renderLicenseFront(data: LicenseData): Promise<Canvas> {
     const y = startY + idx * lineGap;
     drawRowIcon(ctx, r.icon, 120, y);
 
-    // Label
     ctx.fillStyle = TEXT_DARK;
     ctx.font = font(20);
     ctx.textAlign = "left";
     ctx.fillText(r.label, 155, y + 7);
-
-    // Deux-points
     ctx.fillText(":", 380, y + 7);
 
-    // Valeur en ROUGE
     ctx.fillStyle = RED;
     ctx.font = font(22);
     ctx.fillText(r.val, 405, y + 7);
 
-    // Ligne de séparation
     ctx.strokeStyle = "#E2E8F0";
     ctx.lineWidth = 1;
     ctx.beginPath();
@@ -267,7 +277,6 @@ export async function renderLicenseFront(data: LicenseData): Promise<Canvas> {
   // Bas de carte (Signature, QR Code, Tampon)
   const footerY = 960;
 
-  // Signature (Gauche)
   ctx.fillStyle = TEXT_DARK;
   ctx.font = font(14);
   ctx.textAlign = "left";
@@ -275,7 +284,6 @@ export async function renderLicenseFront(data: LicenseData): Promise<Canvas> {
   ctx.font = font(12, "regular");
   ctx.fillText("UCUP 2026", 100, footerY + 98);
 
-  // Traceur de signature fictive
   ctx.strokeStyle = "#1E293B";
   ctx.lineWidth = 2;
   ctx.beginPath();
@@ -283,7 +291,6 @@ export async function renderLicenseFront(data: LicenseData): Promise<Canvas> {
   ctx.bezierCurveTo(130, footerY + 10, 150, footerY + 60, 190, footerY + 30);
   ctx.stroke();
 
-  // QR Code (Centre)
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(
     `${process.env.NEXT_PUBLIC_SITE_URL ?? ""}/players/verify/${data.licenseNumber}`
   )}`;
@@ -292,7 +299,6 @@ export async function renderLicenseFront(data: LicenseData): Promise<Canvas> {
     ctx.drawImage(qrImage, (CARD_WIDTH - 130) / 2, footerY, 130, 130);
   }
 
-  // Tampon rond officiel (Droite)
   ctx.save();
   ctx.translate(CARD_WIDTH - 160, footerY + 65);
   ctx.beginPath();
@@ -310,17 +316,16 @@ export async function renderLicenseFront(data: LicenseData): Promise<Canvas> {
   ctx.fillText("2026", 0, 15);
   ctx.restore();
 
-  // Bandeau inférieur
+  // Bandeau inférieur avec coins rouges
   const botY = CARD_HEIGHT - 50;
   ctx.fillStyle = NAVY;
   ctx.fillRect(0, botY, CARD_WIDTH, 50);
 
-  // Angles rouges en bas
   ctx.fillStyle = RED;
   ctx.beginPath();
-  ctx.moveTo(0, CARD_HEIGHT); ctx.lineTo(80, CARD_HEIGHT); ctx.lineTo(0, botY); ctx.closePath(); ctx.fill();
+  ctx.moveTo(0, CARD_HEIGHT); ctx.lineTo(90, CARD_HEIGHT); ctx.lineTo(0, botY); ctx.closePath(); ctx.fill();
   ctx.beginPath();
-  ctx.moveTo(CARD_WIDTH, CARD_HEIGHT); ctx.lineTo(CARD_WIDTH - 80, CARD_HEIGHT); ctx.lineTo(CARD_WIDTH, botY); ctx.closePath(); ctx.fill();
+  ctx.moveTo(CARD_WIDTH, CARD_HEIGHT); ctx.lineTo(CARD_WIDTH - 90, CARD_HEIGHT); ctx.lineTo(CARD_WIDTH, botY); ctx.closePath(); ctx.fill();
 
   ctx.fillStyle = "white";
   ctx.font = font(16);
@@ -338,18 +343,37 @@ export async function renderLicenseBack(data: LicenseData): Promise<Canvas> {
   const canvas = createCanvas(CARD_WIDTH, CARD_HEIGHT);
   const ctx = canvas.getContext("2d");
 
-  // Fond clair
+  // 1. Fond clair
   ctx.fillStyle = "#F8FAFC";
   ctx.fillRect(0, 0, CARD_WIDTH, CARD_HEIGHT);
 
-  // En-tête bleu nuit
+  // 2. Grande bande Bleu Nuit en diagonale vers le bas à droite
   ctx.fillStyle = NAVY;
-  ctx.fillRect(0, 0, CARD_WIDTH, 180);
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.lineTo(CARD_WIDTH, 0);
+  ctx.lineTo(CARD_WIDTH, 660);
+  ctx.lineTo(0, 200);
+  ctx.closePath();
+  ctx.fill();
 
-  // Triangle rouge à gauche
+  // 3. Triangle Rouge haut gauche
   ctx.fillStyle = RED;
   ctx.beginPath();
-  ctx.moveTo(0, 0); ctx.lineTo(130, 0); ctx.lineTo(0, 180); ctx.closePath(); ctx.fill();
+  ctx.moveTo(0, 0);
+  ctx.lineTo(160, 0);
+  ctx.lineTo(0, 200);
+  ctx.closePath();
+  ctx.fill();
+
+  // 4. Grand Triangle Rouge en bas à droite
+  ctx.fillStyle = RED;
+  ctx.beginPath();
+  ctx.moveTo(CARD_WIDTH, CARD_HEIGHT);
+  ctx.lineTo(600, CARD_HEIGHT);
+  ctx.lineTo(CARD_WIDTH, 800);
+  ctx.closePath();
+  ctx.fill();
 
   // Logo UCUP
   const tournamentLogo = await safeLoadImage(data.tournamentLogo);
@@ -387,7 +411,7 @@ export async function renderLicenseBack(data: LicenseData): Promise<Canvas> {
   ctx.textAlign = "center";
   ctx.fillText("CONDITIONS D'UTILISATION", cardX + 170, cardY + 51);
 
-  // Puces des conditions
+  // Conditions
   const conds = [
     "Cette licence est strictement personnelle et valable uniquement pour le Championnat Universitaire de Football UCUP 2026.",
     "Elle permet au joueur de participer aux rencontres officielles organisées dans le cadre du tournoi.",
@@ -397,7 +421,6 @@ export async function renderLicenseBack(data: LicenseData): Promise<Canvas> {
 
   let cY = cardY + 105;
   conds.forEach((text) => {
-    // Icône bouclier rouge
     ctx.fillStyle = RED;
     ctx.beginPath();
     ctx.arc(cardX + 45, cY + 8, 14, 0, Math.PI * 2);
@@ -407,12 +430,10 @@ export async function renderLicenseBack(data: LicenseData): Promise<Canvas> {
     ctx.textAlign = "center";
     ctx.fillText("✓", cardX + 45, cY + 12);
 
-    // Texte condition
     ctx.fillStyle = TEXT_DARK;
     ctx.font = font(15, "regular");
     ctx.textAlign = "left";
 
-    // Subdiviser les textes longs
     const words = text.split(" ");
     let line = "";
     let lineY = cY + 12;
@@ -480,7 +501,7 @@ export async function renderLicenseBack(data: LicenseData): Promise<Canvas> {
     }
   });
 
-  // Pilule d'avertissement rouge en bas
+  // Pilule d'avertissement rouge
   const warnY = blockY + blockH + 35;
   ctx.fillStyle = RED;
   roundRect(ctx, cardX, warnY, cardW, 60, 12);
