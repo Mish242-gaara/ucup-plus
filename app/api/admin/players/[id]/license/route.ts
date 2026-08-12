@@ -55,7 +55,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     ]);
 
     const pdf = await PDFDocument.create();
-    // 900x1260px @ 300dpi -> points (1px = 72/300 pt)
     const pageW = (CARD_WIDTH * 72) / 300;
     const pageH = (CARD_HEIGHT * 72) / 300;
 
@@ -66,7 +65,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     }
 
     const bytes = await pdf.save();
-    return new NextResponse(Buffer.from(bytes), {
+    return new NextResponse(new Uint8Array(bytes), {
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": `attachment; filename="${fileBase}.pdf"`,
@@ -77,7 +76,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const canvas = side === "back" ? await renderLicenseBack(data) : await renderLicenseFront(data);
   const buffer = await canvasToBuffer(canvas, format === "jpg" ? "jpeg" : "png");
 
-  return new NextResponse(buffer, {
+  return new NextResponse(new Uint8Array(buffer), {
     headers: {
       "Content-Type": format === "jpg" ? "image/jpeg" : "image/png",
       "Content-Disposition": `attachment; filename="${fileBase}-${side}.${format}"`,
