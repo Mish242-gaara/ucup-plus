@@ -3,7 +3,6 @@ import { getElapsedSeconds, currentMinute } from "@/lib/elapsed-time";
 import LiveFeed from "@/components/LiveFeed";
 import { MatchStatus } from "@prisma/client";
 
-// Force le rendu dynamique pour éviter les erreurs de pré-rendu statique avec searchParams
 export const dynamic = "force-dynamic";
 
 const matchInclude = {
@@ -17,7 +16,8 @@ export default async function MatchesPage({
   searchParams: Promise<{ filter?: string }>;
 }) {
   const { filter } = await searchParams;
-  const validFilter = filter === "live" || filter === "finished" || filter === "upcoming" ? filter : undefined;
+  const validFilter =
+    filter === "live" || filter === "finished" || filter === "upcoming" ? filter : undefined;
 
   const statusFilter =
     validFilter === "live"
@@ -38,7 +38,10 @@ export default async function MatchesPage({
   const initialMatches = matches.map((m) => ({
     ...m,
     matchDate: m.matchDate.toISOString(),
-    currentMinute: m.status === "live" || m.status === "halftime" ? currentMinute(getElapsedSeconds(m)) : null,
+    currentMinute:
+      m.status === "live" || m.status === "halftime"
+        ? currentMinute(getElapsedSeconds(m))
+        : null,
   }));
 
   const title =
@@ -55,7 +58,9 @@ export default async function MatchesPage({
       <h1 className="text-xl font-extrabold uppercase tracking-wide text-ink">{title}</h1>
 
       <div className="mt-4">
+        {/* 💡 La prop 'key' force la réinitialisation immédiate lors du changement de filtre */}
         <LiveFeed
+          key={validFilter ?? "all"}
           initialMatches={initialMatches}
           filter={validFilter}
           emptyMessage="Aucun match à afficher pour ce filtre."

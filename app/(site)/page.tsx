@@ -21,17 +21,23 @@ export default async function HomePage() {
   const initialMatches = matches.map((m) => ({
     ...m,
     matchDate: m.matchDate.toISOString(),
-    currentMinute: m.status === "live" || m.status === "halftime" ? currentMinute(getElapsedSeconds(m)) : null,
+    currentMinute:
+      m.status === "live" || m.status === "halftime"
+        ? currentMinute(getElapsedSeconds(m))
+        : null,
   }));
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-8">
       <div className="grid gap-6 lg:grid-cols-3">
         <section className="lg:col-span-2">
-          <h1 className="text-xl font-extrabold uppercase tracking-wide text-ink">Live Score Feed</h1>
+          <h1 className="text-xl font-extrabold uppercase tracking-wide text-ink">
+            Live Score Feed
+          </h1>
 
           <div className="mt-4">
             <LiveFeed
+              key="homepage-feed"
               initialMatches={initialMatches}
               emptyMessage="Aucun match en direct ou à venir pour le moment."
             />
