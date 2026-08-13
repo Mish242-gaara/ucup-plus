@@ -1,9 +1,18 @@
-export default function FlashInfo() {
-  const announcements = [
-    "🏆 Championnat Universitaire UCUP 2026 - Restez connectés pour les scores en direct !",
-    "⚠️ Pensez à vérifier la validité de vos licences joueurs avant chaque match.",
-    "📍 Rendez-vous ce week-end au Camp Militaire pour les grands chocs de la journée !",
-  ];
+import { prisma } from "@/lib/prisma";
+
+type Announcement = {
+  id: number;
+  text: string;
+  active?: boolean;
+};
+
+export default async function FlashInfo() {
+  const announcements: Announcement[] = await (prisma as any).announcement.findMany({
+    where: { active: true },
+    orderBy: { createdAt: "desc" },
+  });
+
+  if (!announcements || announcements.length === 0) return null;
 
   return (
     <div className="bg-red-600 text-white text-xs font-semibold py-2 px-4 overflow-hidden shadow-inner flex items-center gap-3">
@@ -11,9 +20,9 @@ export default function FlashInfo() {
         FLASH INFO
       </span>
       <div className="whitespace-nowrap animate-marquee flex gap-8">
-        {announcements.map((text, i) => (
-          <span key={i} className="inline-block">
-            {text}
+        {announcements.map((item: Announcement) => (
+          <span key={item.id} className="inline-block">
+            {item.text}
           </span>
         ))}
       </div>
