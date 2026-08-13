@@ -1,9 +1,16 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
+import TeamLogo from "@/components/TeamLogo";
 
 export default async function StandingsWidget() {
   const standings = await prisma.standing.findMany({
-    include: { team: true },
+    include: {
+      team: {
+        include: {
+          university: true, // <-- Récupération du logo de l'université
+        },
+      },
+    },
     orderBy: [{ points: "desc" }, { goalDifference: "desc" }],
   });
 
@@ -32,7 +39,17 @@ export default async function StandingsWidget() {
                   <span className={`block h-3 w-1 rounded-full ${i < 2 ? "bg-green-500" : "bg-transparent"}`} />
                 </td>
                 <td className="py-1.5 pr-2 font-bold text-gray-400">{i + 1}</td>
-                <td className="py-1.5 font-semibold text-ink">{s.team.name}</td>
+                <td className="py-1.5 font-semibold text-ink">
+                  <div className="flex items-center gap-2">
+                    {/* Logo de l'équipe */}
+                    <TeamLogo
+                      name={s.team.name}
+                      logo={s.team.university?.logo}
+                      size={18}
+                    />
+                    <span>{s.team.name}</span>
+                  </div>
+                </td>
                 <td className="py-1.5 pl-2 text-right font-bold text-brand-500">{s.points}</td>
               </tr>
             ))}
