@@ -102,7 +102,7 @@ export default async function LeaderboardPage() {
                         </span>
                       )}
                     </div>
-                    <span className="font-semibold text-gray-800 transition-colors group-hover:text-brand-600 group-hover:underline">
+                    <span className="font-semibold text-gray-800 transition-colors group-hover:text-brand-600 no-underline">
                       {p.firstName} {p.lastName}
                     </span>
                   </Link>
