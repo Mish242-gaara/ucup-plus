@@ -26,13 +26,13 @@
   }
 }
 
-/* --- Keyframes & Utilitaires d'Animation --- */
-@keyframes marquee {
+/* --- Animation du Flash Info (De Gauche/Badge vers la Droite) --- */
+@keyframes marquee-right {
   0% {
-    transform: translateX(100%);
+    transform: translateX(-100%);
   }
   100% {
-    transform: translateX(-100%);
+    transform: translateX(100%);
   }
 }
 
@@ -40,7 +40,7 @@
   .animate-marquee {
     display: inline-flex;
     white-space: nowrap;
-    animation: marquee 25s linear infinite;
+    animation: marquee-right 20s linear infinite;
   }
 
   .animate-marquee:hover {
