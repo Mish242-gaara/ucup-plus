@@ -13,13 +13,20 @@ export default async function TeamsPage() {
       include: { university: true },
     }),
     prisma.standing.findMany(),
-    prisma.player.groupBy({ by: ["teamId"], where: { status: "approved" }, _count: { id: true } }),
-    prisma.match.findMany({ select: { homeTeamId: true, awayTeamId: true, status: true } }),
+    prisma.player.groupBy({
+      by: ["teamId"],
+      where: { status: "approved" },
+      _count: { id: true },
+    }),
+    prisma.match.findMany({
+      select: { homeTeamId: true, awayTeamId: true, status: true },
+    }),
   ]);
 
   const groupByTeam = new Map(standings.map((s) => [s.teamId, s.group]));
   const playerCountByTeam = new Map(playerCounts.map((p) => [p.teamId, p._count.id]));
   const matchCountByTeam = new Map<number, number>();
+
   for (const m of matchCounts) {
     matchCountByTeam.set(m.homeTeamId, (matchCountByTeam.get(m.homeTeamId) ?? 0) + 1);
     matchCountByTeam.set(m.awayTeamId, (matchCountByTeam.get(m.awayTeamId) ?? 0) + 1);
@@ -48,6 +55,7 @@ export default async function TeamsPage() {
 
   return (
     <main>
+      {/* Hero Banner */}
       <div className="relative overflow-hidden bg-gradient-to-br from-brand-800 via-brand-600 to-ink px-4 py-10 text-white">
         <div className="mx-auto flex max-w-6xl flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
           <div>
@@ -73,6 +81,7 @@ export default async function TeamsPage() {
         </div>
       </div>
 
+      {/* Explorer Component */}
       <div className="mx-auto max-w-6xl px-4 py-8">
         <TeamsExplorer
           teams={teamRows}

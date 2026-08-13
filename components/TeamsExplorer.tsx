@@ -39,7 +39,7 @@ function TeamCard({
           e.preventDefault();
           onToggleFavorite();
         }}
-        className="absolute right-3 top-3 text-gray-300 hover:text-brand-500"
+        className="absolute right-3 top-3 text-gray-300 hover:text-brand-500 transition-colors"
         title={favorite ? "Retirer des favoris" : "Ajouter aux favoris"}
       >
         <Star size={18} className={favorite ? "fill-brand-500 text-brand-500" : ""} />
@@ -50,16 +50,16 @@ function TeamCard({
           <TeamLogo name={team.name} logo={team.university.logo} size={compact ? 48 : 72} />
         </div>
         <div className={compact ? "flex-1" : "mt-3"}>
-          <p className="font-bold text-ink">{team.name}</p>
-          <p className={`text-xs text-gray-400 ${compact ? "" : "mx-auto max-w-[180px]"}`}>{team.university.name}</p>
+          <p className="font-bold text-ink hover:text-brand-600 transition-colors">{team.name}</p>
+          <p className={`text-xs text-gray-500 ${compact ? "" : "mx-auto max-w-[180px]"}`}>{team.university.name}</p>
           <div className={`mt-2 flex items-center gap-2 ${compact ? "" : "justify-center"}`}>
             {team.group && (
-              <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-bold text-gray-600">
+              <span className="rounded-full bg-brand-50 border border-brand-100 px-2.5 py-0.5 text-xs font-extrabold text-brand-700">
                 Groupe {team.group}
               </span>
             )}
           </div>
-          <p className="mt-2 text-xs text-gray-400">
+          <p className="mt-2 text-xs font-medium text-gray-500">
             {team.playerCount} joueurs · {team.matchCount} matchs
           </p>
         </div>
@@ -113,64 +113,69 @@ export default function TeamsExplorer({
   return (
     <div className="grid gap-6 lg:grid-cols-4">
       <section className="lg:col-span-3">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 pb-3">
-          <div className="flex gap-1">
+        {/* --- Onglets de basculement de vue --- */}
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 pb-3">
+          <div className="flex items-center gap-2">
             <button
               onClick={() => setMode("all")}
-              className={
+              className={`flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-bold transition-all ${
                 mode === "all"
-                  ? "border-b-2 border-brand-500 px-3 py-2 text-sm font-bold text-brand-600"
-                  : "px-3 py-2 text-sm font-semibold text-gray-500"
-              }
+                  ? "bg-brand-600 text-white shadow-sm"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200 hover:text-ink"
+              }`}
             >
-              <LayoutGrid size={14} className="mr-1.5 inline" /> Toutes les équipes
+              <LayoutGrid size={15} /> Toutes les équipes
             </button>
             <button
               onClick={() => setMode("grouped")}
-              className={
+              className={`flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-bold transition-all ${
                 mode === "grouped"
-                  ? "border-b-2 border-brand-500 px-3 py-2 text-sm font-bold text-brand-600"
-                  : "px-3 py-2 text-sm font-semibold text-gray-500"
-              }
+                  ? "bg-brand-600 text-white shadow-sm"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200 hover:text-ink"
+              }`}
             >
-              <Users2 size={14} className="mr-1.5 inline" /> Par groupe
+              <Users2 size={15} /> Par groupe
             </button>
           </div>
         </div>
 
+        {/* --- Entête résultats et filtres rapides --- */}
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-          <p className="text-sm text-gray-400">
-            {filtered.length} équipe{filtered.length !== 1 ? "s" : ""} trouvée{filtered.length !== 1 ? "s" : ""}
+          <p className="text-sm font-medium text-gray-600">
+            <span className="font-bold text-ink">{filtered.length}</span> équipe{filtered.length !== 1 ? "s" : ""} trouvée{filtered.length !== 1 ? "s" : ""}
           </p>
           <div className="flex items-center gap-2">
             <select
               value={sortKey}
               onChange={(e) => setSortKey(e.target.value as keyof typeof SORTS)}
-              className="site-input py-1.5 text-xs"
+              className="site-input py-1.5 text-xs font-semibold"
             >
               <option value="name">Trier par nom</option>
               <option value="players">Trier par effectif</option>
               <option value="matches">Trier par matchs joués</option>
             </select>
-            <div className="flex overflow-hidden rounded-full border border-gray-200">
+            <div className="flex overflow-hidden rounded-lg border border-gray-200 bg-white p-0.5 shadow-sm">
               <button
                 onClick={() => setView("grid")}
-                className={`p-2 ${view === "grid" ? "bg-brand-500 text-white" : "text-gray-400"}`}
+                className={`p-1.5 rounded transition-colors ${view === "grid" ? "bg-brand-600 text-white" : "text-gray-500 hover:text-ink"}`}
+                title="Vue en grille"
               >
-                <LayoutGrid size={14} />
+                <LayoutGrid size={15} />
               </button>
               <button
                 onClick={() => setView("list")}
-                className={`p-2 ${view === "list" ? "bg-brand-500 text-white" : "text-gray-400"}`}
+                className={`p-1.5 rounded transition-colors ${view === "list" ? "bg-brand-600 text-white" : "text-gray-500 hover:text-ink"}`}
+                title="Vue en liste"
               >
-                <List size={14} />
+                <List size={15} />
               </button>
             </div>
           </div>
         </div>
 
+        {/* --- Affichage des équipes --- */}
         {mode === "all" ? (
-          <div className={`mt-4 grid gap-4 ${view === "grid" ? "sm:grid-cols-2 lg:grid-cols-4" : "grid-cols-1"}`}>
+          <div className={`mt-4 grid gap-4 ${view === "grid" ? "sm:grid-cols-2 lg:grid-cols-3" : "grid-cols-1"}`}>
             {filtered.map((t) => (
               <TeamCard
                 key={t.id}
@@ -180,16 +185,23 @@ export default function TeamsExplorer({
                 compact={view === "list"}
               />
             ))}
-            {filtered.length === 0 && <p className="col-span-full text-sm text-gray-400">Aucune équipe trouvée.</p>}
+            {filtered.length === 0 && (
+              <p className="col-span-full py-8 text-center text-sm font-medium text-gray-500">
+                Aucune équipe ne correspond à vos critères.
+              </p>
+            )}
           </div>
         ) : (
           <div className="mt-4 space-y-8">
             {grouped.map(([g, teamsInGroup]) => (
-              <div key={g}>
-                <h2 className="text-sm font-bold uppercase tracking-wide text-brand-500">
-                  {g === "Sans groupe" ? g : `Groupe ${g}`}
-                </h2>
-                <div className={`mt-3 grid gap-4 ${view === "grid" ? "sm:grid-cols-2 lg:grid-cols-4" : "grid-cols-1"}`}>
+              <div key={g} className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-sm font-extrabold uppercase tracking-wider text-brand-600">
+                    {g === "Sans groupe" ? g : `Groupe ${g}`}
+                  </h2>
+                  <div className="h-px flex-1 bg-gray-200" />
+                </div>
+                <div className={`grid gap-4 ${view === "grid" ? "sm:grid-cols-2 lg:grid-cols-3" : "grid-cols-1"}`}>
                   {teamsInGroup.map((t) => (
                     <TeamCard
                       key={t.id}
@@ -206,52 +218,53 @@ export default function TeamsExplorer({
         )}
       </section>
 
+      {/* --- Barre latérale aperçu & filtres --- */}
       <aside className="space-y-4">
         <div className="site-card p-4">
-          <h2 className="border-l-4 border-brand-500 pl-2 text-sm font-bold text-ink">Aperçu général</h2>
+          <h2 className="border-l-4 border-brand-500 pl-2 text-sm font-extrabold text-ink">Aperçu général</h2>
           <ul className="mt-3 space-y-2.5 text-sm">
             <li className="flex items-center justify-between">
-              <span className="flex items-center gap-2 text-gray-500">
+              <span className="flex items-center gap-2 font-medium text-gray-600">
                 <Shield size={15} className="text-brand-500" /> Total équipes
               </span>
-              <span className="font-bold text-ink">{teams.length}</span>
+              <span className="font-extrabold text-ink">{teams.length}</span>
             </li>
             <li className="flex items-center justify-between">
-              <span className="flex items-center gap-2 text-gray-500">
+              <span className="flex items-center gap-2 font-medium text-gray-600">
                 <Shirt size={15} className="text-brand-500" /> Total joueurs
               </span>
-              <span className="font-bold text-ink">{overview.totalPlayers}</span>
+              <span className="font-extrabold text-ink">{overview.totalPlayers}</span>
             </li>
             <li className="flex items-center justify-between">
-              <span className="flex items-center gap-2 text-gray-500">
+              <span className="flex items-center gap-2 font-medium text-gray-600">
                 <Goal size={15} className="text-brand-500" /> Matchs joués
               </span>
-              <span className="font-bold text-ink">{overview.matchesPlayed}</span>
+              <span className="font-extrabold text-ink">{overview.matchesPlayed}</span>
             </li>
             <li className="flex items-center justify-between">
-              <span className="flex items-center gap-2 text-gray-500">
+              <span className="flex items-center gap-2 font-medium text-gray-600">
                 <Star size={15} className="text-brand-500" /> Buts marqués
               </span>
-              <span className="font-bold text-ink">{overview.goalsFor}</span>
+              <span className="font-extrabold text-ink">{overview.goalsFor}</span>
             </li>
             <li className="flex items-center justify-between">
-              <span className="flex items-center gap-2 text-gray-500">
+              <span className="flex items-center gap-2 font-medium text-gray-600">
                 <ShieldAlert size={15} className="text-brand-500" /> Buts encaissés
               </span>
-              <span className="font-bold text-ink">{overview.goalsAgainst}</span>
+              <span className="font-extrabold text-ink">{overview.goalsAgainst}</span>
             </li>
           </ul>
         </div>
 
         <div className="site-card p-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-bold text-ink">Filtres</h2>
-            <button onClick={reset} className="flex items-center gap-1 text-xs font-semibold text-brand-500 hover:underline">
+            <h2 className="text-sm font-extrabold text-ink">Filtres</h2>
+            <button onClick={reset} className="flex items-center gap-1 text-xs font-bold text-brand-600 hover:underline">
               <RotateCcw size={12} /> Réinitialiser
             </button>
           </div>
 
-          <label className="mt-4 block text-xs font-semibold text-gray-500">Recherche</label>
+          <label className="mt-4 block text-xs font-bold text-gray-700">Recherche</label>
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -259,7 +272,7 @@ export default function TeamsExplorer({
             className="site-input mt-1 w-full"
           />
 
-          <label className="mt-4 block text-xs font-semibold text-gray-500">Filtrer par groupe</label>
+          <label className="mt-4 block text-xs font-bold text-gray-700">Filtrer par groupe</label>
           <select value={group} onChange={(e) => setGroup(e.target.value)} className="site-input mt-1 w-full">
             <option value="all">Tous les groupes</option>
             {groups.map((g) => (
@@ -269,7 +282,7 @@ export default function TeamsExplorer({
             ))}
           </select>
 
-          <label className="mt-4 block text-xs font-semibold text-gray-500">Trier par</label>
+          <label className="mt-4 block text-xs font-bold text-gray-700">Trier par</label>
           <select
             value={sortKey}
             onChange={(e) => setSortKey(e.target.value as keyof typeof SORTS)}
