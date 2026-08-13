@@ -11,21 +11,23 @@ export default async function VerifyLicensePage({
   params: Promise<{ licenseNumber: string }>;
 }) {
   const { licenseNumber } = await params;
+  const decodedNumber = decodeURIComponent(licenseNumber);
 
   const player = await prisma.player.findUnique({
-    where: { licenseNumber: decodeURIComponent(licenseNumber) },
+    where: { licenseNumber: decodedNumber },
     include: { team: { include: { university: true } } },
   });
 
-  const isValid = Boolean(player) && player!.status === "approved";
-  const isPending = Boolean(player) && player!.status !== "approved";
+  // Vérification sécurisée sans crash si player === null
+  const isValid = Boolean(player && player.status === "approved");
+  const isPending = Boolean(player && player.status !== "approved");
 
   return (
     <main className="mx-auto max-w-md px-4 py-10">
       <div className="site-card overflow-hidden">
         <div
           className={`flex flex-col items-center gap-2 px-6 py-8 text-center text-white ${
-            isValid ? "bg-green-600" : isPending ? "bg-yellow-500" : "bg-brand-600"
+            isValid ? "bg-green-600" : isPending ? "bg-yellow-500" : "bg-red-600"
           }`}
         >
           {isValid ? (
