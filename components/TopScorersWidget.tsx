@@ -1,6 +1,6 @@
 import Link from "next/link";
+import Image from "next/image";
 import { prisma } from "@/lib/prisma";
-import TeamLogo from "@/components/TeamLogo";
 
 export default async function TopScorersWidget() {
   const scorers = await prisma.player.findMany({
@@ -11,8 +11,9 @@ export default async function TopScorersWidget() {
       id: true,
       firstName: true,
       lastName: true,
+      photo: true, // <-- Ajout de la photo du joueur
       goals: true,
-      team: { select: { name: true, university: { select: { logo: true } } } },
+      team: { select: { name: true } },
     },
   });
 
@@ -33,8 +34,25 @@ export default async function TopScorersWidget() {
             <li key={p.id}>
               <Link href={`/players/${p.id}`} className="flex items-center gap-3">
                 <span className="w-4 text-sm font-bold text-gray-400">{i + 1}</span>
-                <TeamLogo name={p.team.name} logo={p.team.university.logo} size={28} />
-                <span className="flex-1 text-sm font-semibold text-ink">
+                
+                {/* Photo du joueur à la place de TeamLogo */}
+                <div className="relative h-7 w-7 flex-shrink-0 overflow-hidden rounded-full border border-gray-200 bg-gray-100 flex items-center justify-center text-xs font-bold text-gray-600">
+                  {p.photo ? (
+                    <Image
+                      src={p.photo}
+                      alt={`${p.firstName} ${p.lastName}`}
+                      fill
+                      className="object-cover"
+                    />
+                  ) : (
+                    <span>
+                      {p.firstName?.[0]}
+                      {p.lastName?.[0]}
+                    </span>
+                  )}
+                </div>
+
+                <span className="flex-1 text-sm font-semibold text-ink line-clamp-1">
                   {p.firstName} {p.lastName}
                 </span>
                 <span className="text-sm font-bold text-brand-500">{p.goals}</span>
