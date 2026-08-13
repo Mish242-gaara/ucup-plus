@@ -71,7 +71,7 @@ export default async function PlayersPage() {
         </select>
         <input name="birthDate" type="date" className="input" />
         <input name="height" type="number" placeholder="Taille (cm)" className="input" />
-        <input name="nationality" placeholder="Nationalité" defaultValue="DRC" className="input col-span-2" />
+        <input name="nationality" placeholder="Nationalité" defaultValue="Congolaise" className="input col-span-2" />
         <button type="submit" className="btn col-span-2">
           Ajouter (approuvé immédiatement)
         </button>
