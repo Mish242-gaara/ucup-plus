@@ -9,6 +9,7 @@ const NAV = [
   { href: "/admin/teams", label: "Équipes" },
   { href: "/admin/players", label: "Joueurs" },
   { href: "/admin/matches", label: "Matchs" },
+  { href: "/admin/cms", label: "Contenu / CMS" },
   { href: "/admin/news", label: "Actualités" },
   { href: "/admin/gallery", label: "Galerie" },
   { href: "/admin/sponsors", label: "Sponsors" },
@@ -24,7 +25,11 @@ export default function AdminNav() {
   return (
     <nav className="mt-6 space-y-1">
       {NAV.map((item) => {
-        const active = item.href === "/admin" ? pathname === "/admin" : pathname.startsWith(item.href);
+        const active =
+          item.href === "/admin"
+            ? pathname === "/admin"
+            : pathname.startsWith(item.href);
+            
         return (
           <Link
             key={item.href}
