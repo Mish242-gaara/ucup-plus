@@ -106,7 +106,10 @@ export default function TeamProfile({
   const initialTab = TAB_PARAM[searchParams.get("tab") ?? ""] ?? "Aperçu";
   const [tab, setTab] = useState<(typeof TABS)[number]>(initialTab);
 
-  const topScorers = [...players].sort((a, b) => b.goals - a.goals).slice(0, 5);
+  const topScorers = [...players]
+    .filter((p) => p.goals > 0)
+    .sort((a, b) => b.goals - a.goals)
+    .slice(0, 5);
 
   return (
     <main>
