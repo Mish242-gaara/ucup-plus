@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { prisma } from "@/lib/prisma";
 
 // Force le rendu dynamique sur le serveur pour éviter les erreurs de pré-rendu statique lors du build
@@ -14,6 +15,7 @@ export default async function LeaderboardPage() {
         id: true,
         firstName: true,
         lastName: true,
+        photo: true, // <-- Ajout de la photo
         goals: true,
         assists: true,
         yellowCards: true,
@@ -29,6 +31,7 @@ export default async function LeaderboardPage() {
         id: true,
         firstName: true,
         lastName: true,
+        photo: true, // <-- Ajout de la photo
         goals: true,
         assists: true,
         yellowCards: true,
@@ -44,6 +47,7 @@ export default async function LeaderboardPage() {
         id: true,
         firstName: true,
         lastName: true,
+        photo: true, // <-- Ajout de la photo
         goals: true,
         assists: true,
         yellowCards: true,
@@ -80,8 +84,21 @@ export default async function LeaderboardPage() {
             <tr key={p.id} className="border-t border-gray-100">
               <td className="py-2 text-gray-400">{i + 1}</td>
               <td className="py-2">
-                <Link href={`/players/${p.id}`} className="hover:text-brand-500">
-                  {p.firstName} {p.lastName}
+                <Link href={`/players/${p.id}`} className="flex items-center gap-2 hover:text-brand-500">
+                  {/* Photo du joueur avec fallback si vide */}
+                  <div className="relative h-8 w-8 flex-shrink-0 overflow-hidden rounded-full bg-gray-200 flex items-center justify-center font-bold text-xs text-gray-600">
+                    {p.photo ? (
+                      <Image
+                        src={p.photo}
+                        alt={`${p.firstName} ${p.lastName}`}
+                        fill
+                        className="object-cover"
+                      />
+                    ) : (
+                      <span>{p.firstName?.[0]}{p.lastName?.[0]}</span>
+                    )}
+                  </div>
+                  <span>{p.firstName} {p.lastName}</span>
                 </Link>
               </td>
               <td className="py-2">{p.team.name}</td>
