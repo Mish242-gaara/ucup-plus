@@ -25,3 +25,25 @@
     @apply rounded-xl bg-white shadow-card;
   }
 }
+
+/* --- Keyframes & Utilitaires d'Animation --- */
+@keyframes marquee {
+  0% {
+    transform: translateX(100%);
+  }
+  100% {
+    transform: translateX(-100%);
+  }
+}
+
+@layer utilities {
+  .animate-marquee {
+    display: inline-flex;
+    white-space: nowrap;
+    animation: marquee 25s linear infinite;
+  }
+
+  .animate-marquee:hover {
+    animation-play-state: paused;
+  }
+}
