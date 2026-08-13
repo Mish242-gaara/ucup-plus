@@ -291,8 +291,16 @@ export async function renderLicenseFront(data: LicenseData): Promise<Canvas> {
   ctx.bezierCurveTo(130, footerY + 10, 150, footerY + 60, 190, footerY + 30);
   ctx.stroke();
 
+  // 💡 URL Dynamique : Utilise l'URL du domaine de prod Vercel si disponible
+  const baseUrl =
+    process.env.NEXT_PUBLIC_APP_URL ||
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "https://ucup-plus.vercel.app");
+
+  const verifyUrl = `${baseUrl}/players/verify/${data.licenseNumber}`;
+
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(
-    `${process.env.NEXT_PUBLIC_SITE_URL ?? ""}/players/verify/${data.licenseNumber}`
+    verifyUrl
   )}`;
   const qrImage = await safeLoadImage(qrUrl);
   if (qrImage) {
