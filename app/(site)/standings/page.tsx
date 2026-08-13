@@ -4,10 +4,15 @@ import LiveStandings from "@/components/LiveStandings";
 // Force le rendu dynamique pour éviter les erreurs de pré-rendu statique lors du build
 export const dynamic = "force-dynamic";
 
-
 export default async function StandingsPage() {
   const standings = await prisma.standing.findMany({
-    include: { team: true },
+    include: {
+      team: {
+        include: {
+          university: true, // <-- Pour inclure le logo de l'université
+        },
+      },
+    },
     orderBy: [{ points: "desc" }, { goalDifference: "desc" }, { goalsFor: "desc" }],
   });
 

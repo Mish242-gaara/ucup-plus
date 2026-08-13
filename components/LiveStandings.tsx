@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useRealtime } from "@/lib/hooks/useRealtime";
+import TeamLogo from "@/components/TeamLogo";
 
 type ApiStanding = {
   id: number;
@@ -15,7 +16,12 @@ type ApiStanding = {
   goalsAgainst: number;
   goalDifference: number;
   points: number;
-  team: { name: string };
+  team: {
+    name: string;
+    university?: {
+      logo: string | null;
+    } | null;
+  };
 };
 
 export default function LiveStandings({ initialStandings }: { initialStandings: ApiStanding[] }) {
@@ -72,8 +78,14 @@ export default function LiveStandings({ initialStandings }: { initialStandings: 
                         />
                       </td>
                       <td className="py-2">
-                        <Link href={`/teams/${s.teamId}`} className="hover:text-brand-500">
-                          {s.team.name}
+                        <Link href={`/teams/${s.teamId}`} className="flex items-center gap-2 hover:text-brand-500">
+                          {/* Logo de l'équipe */}
+                          <TeamLogo
+                            name={s.team.name}
+                            logo={s.team.university?.logo}
+                            size={20}
+                          />
+                          <span className="font-semibold text-ink">{s.team.name}</span>
                         </Link>
                       </td>
                       <td className="py-2 text-center">{s.played}</td>
