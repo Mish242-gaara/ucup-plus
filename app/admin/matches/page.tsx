@@ -10,6 +10,13 @@ import {
 
 import ConfirmButton from "@/components/ConfirmButton";
 const STATUSES = ["scheduled", "live", "halftime", "finished", "postponed"] as const;
+const STATUS_LABELS: Record<string, string> = {
+  scheduled: "À venir",
+  live: "En direct",
+  halftime: "Mi-temps",
+  finished: "Terminé",
+  postponed: "Reporté",
+};
 
 export default async function MatchesPage() {
   const [matches, teams] = await Promise.all([
@@ -95,7 +102,7 @@ export default async function MatchesPage() {
               </div>
               <div className="flex items-center gap-3">
                 <span className="rounded-full bg-zinc-800 px-3 py-1 text-xs uppercase tracking-wide text-gray-300">
-                  {m.status}
+                  {STATUS_LABELS[m.status] ?? m.status}
                 </span>
                 <a href={`/admin/matches/${m.id}/edit`} className="text-xs text-brand-500 hover:underline">
                   Modifier →
@@ -137,7 +144,7 @@ export default async function MatchesPage() {
                 <select name="status" defaultValue={m.status} className="input">
                   {STATUSES.map((s) => (
                     <option key={s} value={s}>
-                      {s}
+                      {STATUS_LABELS[s]}
                     </option>
                   ))}
                 </select>

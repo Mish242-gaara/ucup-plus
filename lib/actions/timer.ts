@@ -49,6 +49,19 @@ export async function pauseTimer(matchId: number) {
   await refresh(matchId);
 }
 
+/** Explicit half-time break: freezes the timer AND sets status to "halftime" (shown distinctly on the public site). */
+export async function setHalftime(matchId: number) {
+  await requireAdmin();
+  const match = await prisma.match.findUniqueOrThrow({ where: { id: matchId } });
+  const elapsed = getElapsedSeconds(match);
+
+  await prisma.match.update({
+    where: { id: matchId },
+    data: { status: "halftime", elapsedTime: elapsed, timerPausedAt: new Date() },
+  });
+  await refresh(matchId);
+}
+
 /** Resume: restart start_time from now, keep accumulated elapsed_time as base */
 export async function resumeTimer(matchId: number) {
   await requireAdmin();

@@ -1,0 +1,1521 @@
+diff --git a/app/(site)/players/[id]/page.tsx b/app/(site)/players/[id]/page.tsx
+index 823fe51..a8f8904 100644
+--- a/app/(site)/players/[id]/page.tsx
++++ b/app/(site)/players/[id]/page.tsx
+@@ -38,17 +38,40 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
+ 
+   if (!player || player.status !== "approved") notFound();
+ 
+-  const lineups = await prisma.matchLineup.findMany({
+-    where: { playerId },
+-    include: {
+-      match: { include: { homeTeam: true, awayTeam: true } },
+-    },
+-    orderBy: { match: { matchDate: "desc" } },
+-    take: 10,
+-  });
++  // Matches this player took part in: from published lineups AND, as a
++  // fallback, from any match event they're credited with (goal, assist,
++  // sub) — a match without a published composition would otherwise never
++  // show up here even if the player actually scored in it.
++  const [lineups, playerEvents] = await Promise.all([
++    prisma.matchLineup.findMany({
++      where: { playerId },
++      select: { matchId: true, teamId: true, role: true },
++    }),
++    prisma.matchEvent.findMany({
++      where: { OR: [{ playerId }, { assistPlayerId: playerId }] },
++      select: { matchId: true, teamId: true },
++    }),
++  ]);
++
++  const roleByMatch = new Map(lineups.map((l) => [l.matchId, l.role]));
++  const teamByMatch = new Map<number, number>();
++  for (const l of lineups) teamByMatch.set(l.matchId, l.teamId);
++  for (const e of playerEvents) if (!teamByMatch.has(e.matchId)) teamByMatch.set(e.matchId, e.teamId);
++
++  const involvedMatchIds = Array.from(
++    new Set([...lineups.map((l) => l.matchId), ...playerEvents.map((e) => e.matchId)])
++  );
+ 
+-  const finishedLineups = lineups.filter((l) => l.match.status === "finished");
+-  const matchIds = finishedLineups.map((l) => l.matchId);
++  const involvedMatches = involvedMatchIds.length
++    ? await prisma.match.findMany({
++        where: { id: { in: involvedMatchIds }, status: "finished" },
++        include: { homeTeam: true, awayTeam: true },
++        orderBy: { matchDate: "desc" },
++        take: 10,
++      })
++    : [];
++
++  const matchIds = involvedMatches.map((m) => m.id);
+ 
+   const events = matchIds.length
+     ? await prisma.matchEvent.findMany({
+@@ -71,9 +94,9 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
+     assistsByMatch.set(e.matchId, (assistsByMatch.get(e.matchId) ?? 0) + 1);
+   }
+ 
+-  const history = finishedLineups.map((l) => {
+-    const m = l.match;
+-    const isHome = m.homeTeamId === l.teamId;
++  const history = involvedMatches.map((m) => {
++    const teamId = teamByMatch.get(m.id);
++    const isHome = teamId ? m.homeTeamId === teamId : true;
+     const opponent = isHome ? m.awayTeam.name : m.homeTeam.name;
+     const matchEvents = eventsByMatch.get(m.id) ?? [];
+     const goals = matchEvents.filter((e) => ["goal", "penalty_goal"].includes(e.eventType)).length;
+@@ -86,12 +109,14 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
+     const teamResult = teamScore > otherScore ? "win" : teamScore < otherScore ? "loss" : "draw";
+     const rating = computeMatchRating({ goals, assists, yellowCards: yellow, redCards: red, teamResult });
+ 
++    const role = roleByMatch.get(m.id);
++
+     return {
+       matchId: m.id,
+       date: m.matchDate,
+       opponent,
+       score: `${m.homeScore} - ${m.awayScore}`,
+-      role: l.role === "starter" ? "Titulaire" : "Remplaçant",
++      role: role === "starter" ? "Titulaire" : role === "substitute" ? "Remplaçant" : "Participation enregistrée",
+       goals,
+       yellow,
+       red,
+diff --git a/app/(site)/players/verify/[licenseNumber]/page.tsx b/app/(site)/players/verify/[licenseNumber]/page.tsx
+new file mode 100644
+index 0000000..00232d4
+--- /dev/null
++++ b/app/(site)/players/verify/[licenseNumber]/page.tsx
+@@ -0,0 +1,110 @@
++import { ShieldCheck, ShieldX, ShieldQuestion } from "lucide-react";
++import { prisma } from "@/lib/prisma";
++import TeamLogo from "@/components/TeamLogo";
++import type { Metadata } from "next";
++
++export const metadata: Metadata = { title: "Vérification de licence — UCUP 2026" };
++
++export default async function VerifyLicensePage({
++  params,
++}: {
++  params: Promise<{ licenseNumber: string }>;
++}) {
++  const { licenseNumber } = await params;
++
++  const player = await prisma.player.findUnique({
++    where: { licenseNumber: decodeURIComponent(licenseNumber) },
++    include: { team: { include: { university: true } } },
++  });
++
++  const isValid = Boolean(player) && player!.status === "approved";
++  const isPending = Boolean(player) && player!.status !== "approved";
++
++  return (
++    <main className="mx-auto max-w-md px-4 py-10">
++      <div className="site-card overflow-hidden">
++        <div
++          className={`flex flex-col items-center gap-2 px-6 py-8 text-center text-white ${
++            isValid ? "bg-green-600" : isPending ? "bg-yellow-500" : "bg-brand-600"
++          }`}
++        >
++          {isValid ? (
++            <ShieldCheck size={48} />
++          ) : isPending ? (
++            <ShieldQuestion size={48} />
++          ) : (
++            <ShieldX size={48} />
++          )}
++          <p className="text-lg font-extrabold uppercase tracking-wide">
++            {isValid ? "Licence valide" : isPending ? "Licence en attente de validation" : "Licence invalide"}
++          </p>
++          <p className="text-xs opacity-90">
++            {isValid
++              ? "Ce document correspond à un joueur inscrit et approuvé pour l'UCUP 2026."
++              : isPending
++                ? "Ce numéro existe mais le joueur n'est pas encore validé par l'organisation."
++                : "Aucune licence UCUP 2026 ne correspond à ce numéro."}
++          </p>
++        </div>
++
++        {player && (
++          <div className="p-6">
++            <div className="flex items-center gap-4">
++              <div className="h-16 w-16 shrink-0 overflow-hidden rounded-full border border-gray-200 bg-gray-100">
++                {player.photo ? (
++                  // eslint-disable-next-line @next/next/no-img-element
++                  <img
++                    src={player.photo}
++                    alt={`${player.firstName} ${player.lastName}`}
++                    className="h-full w-full object-cover"
++                  />
++                ) : (
++                  <div className="flex h-full w-full items-center justify-center text-lg font-bold text-gray-400">
++                    {player.firstName[0]}
++                    {player.lastName[0]}
++                  </div>
++                )}
++              </div>
++              <div>
++                <p className="font-bold text-ink">
++                  {player.firstName} {player.lastName}
++                </p>
++                <div className="mt-0.5 flex items-center gap-1.5 text-sm text-gray-500">
++                  <TeamLogo name={player.team.name} logo={player.team.university.logo} size={16} />
++                  {player.team.name}
++                </div>
++              </div>
++            </div>
++
++            <dl className="mt-6 space-y-2 border-t border-gray-100 pt-4 text-sm">
++              <div className="flex justify-between">
++                <dt className="text-gray-400">Numéro de licence</dt>
++                <dd className="font-mono font-semibold text-ink">{player.licenseNumber}</dd>
++              </div>
++              <div className="flex justify-between">
++                <dt className="text-gray-400">Poste</dt>
++                <dd className="font-semibold text-ink">{player.position}</dd>
++              </div>
++              <div className="flex justify-between">
++                <dt className="text-gray-400">Numéro de maillot</dt>
++                <dd className="font-semibold text-ink">#{player.jerseyNumber}</dd>
++              </div>
++              <div className="flex justify-between">
++                <dt className="text-gray-400">Université</dt>
++                <dd className="font-semibold text-ink">{player.team.university.name}</dd>
++              </div>
++              <div className="flex justify-between">
++                <dt className="text-gray-400">Saison</dt>
++                <dd className="font-semibold text-ink">2026</dd>
++              </div>
++            </dl>
++          </div>
++        )}
++      </div>
++
++      <p className="mt-4 text-center text-xs text-gray-400">
++        Vérification officielle UCUP 2026 — en cas de doute, contacte le comité d&apos;organisation.
++      </p>
++    </main>
++  );
++}
+diff --git a/app/admin/matches/[id]/live/page.tsx b/app/admin/matches/[id]/live/page.tsx
+index 6ea52c2..9b5745d 100644
+--- a/app/admin/matches/[id]/live/page.tsx
++++ b/app/admin/matches/[id]/live/page.tsx
+@@ -4,6 +4,7 @@ import { getElapsedSeconds, formatElapsed } from "@/lib/elapsed-time";
+ import {
+   startTimer,
+   pauseTimer,
++  setHalftime,
+   resumeTimer,
+   stopTimer,
+   addAdditionalTime,
+@@ -16,19 +17,27 @@ import ConfirmButton from "@/components/ConfirmButton";
+ import WhatsAppShareLink from "@/components/WhatsAppShareLink";
+ 
+ const EVENT_TYPES = [
+-  "goal",
+-  "penalty_goal",
+-  "own_goal",
+-  "yellow_card",
+-  "second_yellow",
+-  "red_card",
+-  "substitution_in",
+-  "substitution_out",
+-  "injury",
+-  "penalty_missed",
+-  "big_chance_missed",
++  { value: "goal", label: "But" },
++  { value: "penalty_goal", label: "But sur penalty" },
++  { value: "own_goal", label: "But contre son camp" },
++  { value: "yellow_card", label: "Carton jaune" },
++  { value: "second_yellow", label: "Deuxième jaune (exclusion)" },
++  { value: "red_card", label: "Carton rouge" },
++  { value: "substitution_in", label: "Entrée en jeu" },
++  { value: "substitution_out", label: "Sortie du joueur" },
++  { value: "injury", label: "Blessure" },
++  { value: "penalty_missed", label: "Penalty manqué" },
++  { value: "big_chance_missed", label: "Grosse occasion manquée" },
+ ];
+ 
++const STATUS_LABELS: Record<string, string> = {
++  scheduled: "À venir",
++  live: "En direct",
++  halftime: "Mi-temps",
++  finished: "Terminé",
++  postponed: "Reporté",
++};
++
+ export default async function AdminLiveMatchPage({ params }: { params: Promise<{ id: string }> }) {
+   const { id } = await params;
+   const matchId = Number(id);
+@@ -54,7 +63,7 @@ export default async function AdminLiveMatchPage({ params }: { params: Promise<{
+         {match.homeTeam.name} {match.homeScore} - {match.awayScore} {match.awayTeam.name}
+       </h1>
+       <p className="mt-1 text-sm text-gray-400">
+-        Statut : <span className="text-gray-300">{match.status}</span> · Temps :{" "}
++        Statut : <span className="text-gray-300">{STATUS_LABELS[match.status] ?? match.status}</span> · Temps :{" "}
+         <span className="tabular-nums text-gray-300">{formatElapsed(elapsed)}</span>
+         {match.timerPausedAt ? " (en pause)" : ""}
+       </p>
+@@ -75,7 +84,12 @@ export default async function AdminLiveMatchPage({ params }: { params: Promise<{
+           </form>
+           <form action={pauseTimer.bind(null, matchId)}>
+             <button className="btn" type="submit">
+-              Pause / Mi-temps
++              Pause
++            </button>
++          </form>
++          <form action={setHalftime.bind(null, matchId)}>
++            <button className="btn" type="submit">
++              Mi-temps
+             </button>
+           </form>
+           <form action={resumeTimer.bind(null, matchId)}>
+@@ -180,8 +194,8 @@ export default async function AdminLiveMatchPage({ params }: { params: Promise<{
+ 
+           <select name="eventType" required className="input">
+             {EVENT_TYPES.map((t) => (
+-              <option key={t} value={t}>
+-                {t}
++              <option key={t.value} value={t.value}>
++                {t.label}
+               </option>
+             ))}
+           </select>
+@@ -269,7 +283,9 @@ export default async function AdminLiveMatchPage({ params }: { params: Promise<{
+                   className="flex items-center justify-between rounded-md border border-white/10 bg-zinc-900 px-3 py-2 text-sm"
+                 >
+                   <span>
+-                    {row.item.minute}&apos; — {row.item.eventType} — {row.item.player.firstName}{" "}
++                    {row.item.minute}&apos; —{" "}
++                    {EVENT_TYPES.find((t) => t.value === row.item.eventType)?.label ?? row.item.eventType} —{" "}
++                    {row.item.player.firstName}{" "}
+                     {row.item.player.lastName} ({row.item.team.name})
+                   </span>
+                   <form action={deleteEvent.bind(null, row.item.id)}>
+diff --git a/app/admin/matches/page.tsx b/app/admin/matches/page.tsx
+index 6e25e4d..35baa42 100644
+--- a/app/admin/matches/page.tsx
++++ b/app/admin/matches/page.tsx
+@@ -10,6 +10,13 @@ import {
+ 
+ import ConfirmButton from "@/components/ConfirmButton";
+ const STATUSES = ["scheduled", "live", "halftime", "finished", "postponed"] as const;
++const STATUS_LABELS: Record<string, string> = {
++  scheduled: "À venir",
++  live: "En direct",
++  halftime: "Mi-temps",
++  finished: "Terminé",
++  postponed: "Reporté",
++};
+ 
+ export default async function MatchesPage() {
+   const [matches, teams] = await Promise.all([
+@@ -95,7 +102,7 @@ export default async function MatchesPage() {
+               </div>
+               <div className="flex items-center gap-3">
+                 <span className="rounded-full bg-zinc-800 px-3 py-1 text-xs uppercase tracking-wide text-gray-300">
+-                  {m.status}
++                  {STATUS_LABELS[m.status] ?? m.status}
+                 </span>
+                 <a href={`/admin/matches/${m.id}/edit`} className="text-xs text-brand-500 hover:underline">
+                   Modifier →
+@@ -137,7 +144,7 @@ export default async function MatchesPage() {
+                 <select name="status" defaultValue={m.status} className="input">
+                   {STATUSES.map((s) => (
+                     <option key={s} value={s}>
+-                      {s}
++                      {STATUS_LABELS[s]}
+                     </option>
+                   ))}
+                 </select>
+diff --git a/app/admin/players/page.tsx b/app/admin/players/page.tsx
+index 27a0a1c..74059e8 100644
+--- a/app/admin/players/page.tsx
++++ b/app/admin/players/page.tsx
+@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
+ import { createPlayer, deletePlayer, setPlayerStatus } from "@/lib/actions/players";
+ import PhotoUploadField from "@/components/PhotoUploadField";
+ import ConfirmButton from "@/components/ConfirmButton";
++import LicenseDownloadMenu from "@/components/LicenseDownloadMenu";
+ 
+ const POSITIONS = ["Gardien", "Défenseur", "Milieu", "Attaquant"];
+ 
+@@ -115,6 +116,7 @@ export default async function PlayersPage() {
+                   <Link href={`/admin/players/${p.id}/edit`} className="text-brand-500 hover:underline">
+                     Modifier
+                   </Link>
++                  <LicenseDownloadMenu playerId={p.id} />
+                   {p.status !== "approved" && (
+                     <form action={setPlayerStatus.bind(null, p.id, "approved")}>
+                       <button className="text-green-600 hover:underline" type="submit">
+diff --git a/app/admin/settings/page.tsx b/app/admin/settings/page.tsx
+new file mode 100644
+index 0000000..f37d3d1
+--- /dev/null
++++ b/app/admin/settings/page.tsx
+@@ -0,0 +1,35 @@
++import { getTournamentSettings, updateTournamentSettings } from "@/lib/actions/settings";
++import PhotoUploadField from "@/components/PhotoUploadField";
++
++export default async function SettingsPage() {
++  const settings = await getTournamentSettings();
++
++  return (
++    <div>
++      <h1 className="text-2xl font-extrabold text-white">Réglages du tournoi</h1>
++      <p className="mt-1 text-sm text-gray-400">
++        Le logo officiel et le nom de l&apos;organisateur renseignés ici apparaissent sur les
++        licences joueur générées depuis la page Joueurs.
++      </p>
++
++      <form action={updateTournamentSettings} className="mt-6 grid max-w-xl grid-cols-2 gap-3">
++        <PhotoUploadField name="logo" initialValue={settings.logo} label="Logo UCUP" />
++        <input
++          name="organizerName"
++          defaultValue={settings.organizerName ?? ""}
++          placeholder="Nom de l'organisateur (ex: Comité d'organisation UCUP 2026)"
++          className="input col-span-2"
++        />
++        <input
++          name="organizerSub"
++          defaultValue={settings.organizerSub ?? ""}
++          placeholder="Précision (ex: Le Bureau Départemental Des Étudiants — Pointe-Noire)"
++          className="input col-span-2"
++        />
++        <button type="submit" className="btn col-span-2">
++          Enregistrer
++        </button>
++      </form>
++    </div>
++  );
++}
+diff --git a/app/api/admin/players/[id]/license/route.ts b/app/api/admin/players/[id]/license/route.ts
+new file mode 100644
+index 0000000..596a027
+--- /dev/null
++++ b/app/api/admin/players/[id]/license/route.ts
+@@ -0,0 +1,86 @@
++import { NextRequest, NextResponse } from "next/server";
++import { PDFDocument } from "pdf-lib";
++import { prisma } from "@/lib/prisma";
++import { requireAdmin } from "@/lib/auth";
++import { renderLicenseFront, renderLicenseBack, canvasToBuffer, CARD_WIDTH, CARD_HEIGHT, type LicenseData } from "@/lib/license";
++import { ensureLicenseNumber, getTournamentSettings } from "@/lib/actions/settings";
++
++export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
++  try {
++    await requireAdmin();
++  } catch {
++    return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
++  }
++
++  const { id } = await params;
++  const playerId = Number(id);
++
++  const format = (req.nextUrl.searchParams.get("format") ?? "png") as "png" | "jpg" | "pdf";
++  const side = (req.nextUrl.searchParams.get("side") ?? "front") as "front" | "back";
++
++  const player = await prisma.player.findUnique({
++    where: { id: playerId },
++    include: { team: { include: { university: true } } },
++  });
++  if (!player) return NextResponse.json({ error: "Joueur introuvable" }, { status: 404 });
++
++  const licenseNumber = await ensureLicenseNumber(playerId);
++  const settings = await getTournamentSettings();
++
++  const data: LicenseData = {
++    firstName: player.firstName,
++    lastName: player.lastName,
++    position: player.position,
++    nationality: player.nationality,
++    jerseyNumber: player.jerseyNumber,
++    licenseNumber,
++    teamName: player.team.name,
++    universityName: player.team.university.name,
++    universityShortName: player.team.university.shortName,
++    photo: player.photo,
++    universityLogo: player.team.university.logo,
++    tournamentLogo: settings.logo,
++    organizerName: settings.organizerName ?? "Comité d'organisation UCUP 2026",
++    organizerSub: settings.organizerSub,
++    issuedDate: new Date().toLocaleDateString("fr-FR"),
++  };
++
++  const fileBase = `licence-${player.firstName}-${player.lastName}`.toLowerCase().replace(/[^a-z0-9-]+/g, "-");
++
++  if (format === "pdf") {
++    const [frontCanvas, backCanvas] = await Promise.all([renderLicenseFront(data), renderLicenseBack(data)]);
++    const [frontPng, backPng] = await Promise.all([
++      canvasToBuffer(frontCanvas, "png"),
++      canvasToBuffer(backCanvas, "png"),
++    ]);
++
++    const pdf = await PDFDocument.create();
++    // 900x1260px @ 300dpi -> points (1px = 72/300 pt)
++    const pageW = (CARD_WIDTH * 72) / 300;
++    const pageH = (CARD_HEIGHT * 72) / 300;
++
++    for (const png of [frontPng, backPng]) {
++      const page = pdf.addPage([pageW, pageH]);
++      const embedded = await pdf.embedPng(png);
++      page.drawImage(embedded, { x: 0, y: 0, width: pageW, height: pageH });
++    }
++
++    const bytes = await pdf.save();
++    return new NextResponse(Buffer.from(bytes), {
++      headers: {
++        "Content-Type": "application/pdf",
++        "Content-Disposition": `attachment; filename="${fileBase}.pdf"`,
++      },
++    });
++  }
++
++  const canvas = side === "back" ? await renderLicenseBack(data) : await renderLicenseFront(data);
++  const buffer = await canvasToBuffer(canvas, format === "jpg" ? "jpeg" : "png");
++
++  return new NextResponse(buffer, {
++    headers: {
++      "Content-Type": format === "jpg" ? "image/jpeg" : "image/png",
++      "Content-Disposition": `attachment; filename="${fileBase}-${side}.${format}"`,
++    },
++  });
++}
+diff --git a/components/AdminNav.tsx b/components/AdminNav.tsx
+index 32ac935..aedea30 100644
+--- a/components/AdminNav.tsx
++++ b/components/AdminNav.tsx
+@@ -14,6 +14,7 @@ const NAV = [
+   { href: "/admin/sponsors", label: "Sponsors" },
+   { href: "/admin/users", label: "Comptes admin" },
+   { href: "/admin/audit", label: "Journal d'activité" },
++  { href: "/admin/settings", label: "Réglages du tournoi" },
+   { href: "/admin/account/2fa", label: "Sécurité (2FA)" },
+ ];
+ 
+diff --git a/components/LicenseDownloadMenu.tsx b/components/LicenseDownloadMenu.tsx
+new file mode 100644
+index 0000000..61a66c5
+--- /dev/null
++++ b/components/LicenseDownloadMenu.tsx
+@@ -0,0 +1,50 @@
++"use client";
++
++import { useState, useRef, useEffect } from "react";
++import { IdCard } from "lucide-react";
++
++const OPTIONS = [
++  { label: "Recto — PNG", format: "png", side: "front" },
++  { label: "Verso — PNG", format: "png", side: "back" },
++  { label: "Recto — JPG", format: "jpg", side: "front" },
++  { label: "Verso — JPG", format: "jpg", side: "back" },
++  { label: "Recto + Verso — PDF", format: "pdf", side: "front" },
++];
++
++export default function LicenseDownloadMenu({ playerId }: { playerId: number }) {
++  const [open, setOpen] = useState(false);
++  const ref = useRef<HTMLDivElement>(null);
++
++  useEffect(() => {
++    function handleClick(e: MouseEvent) {
++      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
++    }
++    document.addEventListener("mousedown", handleClick);
++    return () => document.removeEventListener("mousedown", handleClick);
++  }, []);
++
++  return (
++    <div ref={ref} className="relative inline-block">
++      <button
++        onClick={() => setOpen((o) => !o)}
++        className="flex items-center gap-1 text-brand-500 hover:underline"
++      >
++        <IdCard size={14} /> Licence
++      </button>
++      {open && (
++        <div className="absolute right-0 top-full z-20 mt-1 w-48 overflow-hidden rounded-lg border border-white/10 bg-zinc-900 shadow-lg">
++          {OPTIONS.map((opt) => (
++            <a
++              key={opt.label}
++              href={`/api/admin/players/${playerId}/license?format=${opt.format}&side=${opt.side}`}
++              className="block px-4 py-2 text-left text-xs text-gray-300 hover:bg-white/5 hover:text-white"
++              onClick={() => setOpen(false)}
++            >
++              {opt.label}
++            </a>
++          ))}
++        </div>
++      )}
++    </div>
++  );
++}
+diff --git a/components/PushNotificationToggle.tsx b/components/PushNotificationToggle.tsx
+index 2546f29..ebb2ba2 100644
+--- a/components/PushNotificationToggle.tsx
++++ b/components/PushNotificationToggle.tsx
+@@ -1,12 +1,14 @@
+ "use client";
+ 
+-import { Bell, BellOff } from "lucide-react";
++import { Bell, BellOff, AlertCircle } from "lucide-react";
+ import { usePushNotifications } from "@/lib/hooks/usePushNotifications";
+ 
+ export default function PushNotificationToggle({ favoriteIds }: { favoriteIds: number[] }) {
+-  const { supported, permission, enabled, enable, disable } = usePushNotifications(favoriteIds);
++  const { supported, permission, enabled, busy, error, enable, disable } = usePushNotifications(favoriteIds);
+ 
+-  if (!supported || permission === "unsupported") return null;
++  if (!supported || permission === "unsupported") {
++    return <p className="text-xs text-gray-400">Notifications non supportées par ce navigateur.</p>;
++  }
+ 
+   if (permission === "denied") {
+     return (
+@@ -18,16 +20,26 @@ export default function PushNotificationToggle({ favoriteIds }: { favoriteIds: n
+   }
+ 
+   return (
+-    <button
+-      onClick={enabled ? disable : enable}
+-      className={
+-        enabled
+-          ? "inline-flex items-center gap-1.5 rounded-full bg-brand-500 px-4 py-1.5 text-xs font-bold text-white"
+-          : "inline-flex items-center gap-1.5 rounded-full border border-gray-200 px-4 py-1.5 text-xs font-bold text-gray-500 hover:border-brand-300"
+-      }
+-    >
+-      {enabled ? <Bell size={14} /> : <BellOff size={14} />}
+-      {enabled ? "Notifications activées" : "Activer les notifications"}
+-    </button>
++    <div>
++      <button
++        onClick={enabled ? disable : enable}
++        disabled={busy}
++        className={
++          enabled
++            ? "inline-flex items-center gap-1.5 rounded-full bg-brand-500 px-4 py-1.5 text-xs font-bold text-white disabled:opacity-60"
++            : "inline-flex items-center gap-1.5 rounded-full border border-gray-200 px-4 py-1.5 text-xs font-bold text-gray-500 hover:border-brand-300 disabled:opacity-60"
++        }
++      >
++        {enabled ? <Bell size={14} /> : <BellOff size={14} />}
++        {busy ? "Un instant…" : enabled ? "Notifications activées" : "Activer les notifications"}
++      </button>
++
++      {error && (
++        <p className="mt-2 flex items-start gap-1.5 text-xs text-brand-600">
++          <AlertCircle size={14} className="mt-0.5 shrink-0" />
++          <span>{error}</span>
++        </p>
++      )}
++    </div>
+   );
+ }
+diff --git a/lib/actions/matches.ts b/lib/actions/matches.ts
+index 887b455..f800e9f 100644
+--- a/lib/actions/matches.ts
++++ b/lib/actions/matches.ts
+@@ -120,15 +120,42 @@ export async function updateMatchStatus(
+ ) {
+   await requireAdmin();
+ 
++  const current = await prisma.match.findUniqueOrThrow({ where: { id } });
++  const wasAlreadyFinished = current.status === "finished";
++
+   const data: { status: typeof status; startTime?: Date } = { status };
+-  if (status === "live") {
+-    const current = await prisma.match.findUniqueOrThrow({ where: { id } });
+-    if (!current.startTime) data.startTime = new Date();
++  if (status === "live" && !current.startTime) {
++    data.startTime = new Date();
+   }
+ 
+   await prisma.match.update({ where: { id }, data });
+   await logAudit("match.status_update", "match", id, { status });
+ 
++  if (status === "finished" && !wasAlreadyFinished) {
++    const [lineups, events] = await Promise.all([
++      prisma.matchLineup.findMany({ where: { matchId: id }, select: { playerId: true } }),
++      prisma.matchEvent.findMany({
++        where: { matchId: id },
++        select: { playerId: true, assistPlayerId: true, outPlayerId: true },
++      }),
++    ]);
++
++    const involved = new Set<number>();
++    for (const l of lineups) involved.add(l.playerId);
++    for (const e of events) {
++      involved.add(e.playerId);
++      if (e.assistPlayerId) involved.add(e.assistPlayerId);
++      if (e.outPlayerId) involved.add(e.outPlayerId);
++    }
++
++    if (involved.size > 0) {
++      await prisma.player.updateMany({
++        where: { id: { in: Array.from(involved) } },
++        data: { matchesPlayed: { increment: 1 } },
++      });
++    }
++  }
++
+   if (status === "finished") {
+     await recalculateAllStandings();
+   }
+diff --git a/lib/actions/settings.ts b/lib/actions/settings.ts
+new file mode 100644
+index 0000000..d24fc90
+--- /dev/null
++++ b/lib/actions/settings.ts
+@@ -0,0 +1,76 @@
++"use server";
++
++import { revalidatePath } from "next/cache";
++import { prisma } from "@/lib/prisma";
++import { requireAdmin } from "@/lib/auth";
++import { uploadImage, deleteImage } from "@/lib/blob";
++import { logAudit } from "@/lib/audit";
++
++export async function getTournamentSettings() {
++  const settings = await prisma.tournamentSettings.findUnique({ where: { id: 1 } });
++  return (
++    settings ?? {
++      id: 1,
++      logo: null,
++      organizerName: "Comité d'organisation UCUP 2026",
++      organizerSub: null,
++      updatedAt: new Date(),
++    }
++  );
++}
++
++export async function updateTournamentSettings(formData: FormData) {
++  await requireAdmin();
++
++  const existing = await prisma.tournamentSettings.findUnique({ where: { id: 1 } });
++  const removed = formData.get("logo-removed") === "1";
++  const newLogo = await uploadImage(formData.get("logo") as File | null, "tournament");
++
++  let logo = existing?.logo ?? null;
++  if (newLogo) {
++    await deleteImage(existing?.logo);
++    logo = newLogo;
++  } else if (removed) {
++    await deleteImage(existing?.logo);
++    logo = null;
++  }
++
++  await prisma.tournamentSettings.upsert({
++    where: { id: 1 },
++    create: {
++      id: 1,
++      logo,
++      organizerName: (formData.get("organizerName") as string) || "Comité d'organisation UCUP 2026",
++      organizerSub: (formData.get("organizerSub") as string) || null,
++    },
++    update: {
++      logo,
++      organizerName: (formData.get("organizerName") as string) || "Comité d'organisation UCUP 2026",
++      organizerSub: (formData.get("organizerSub") as string) || null,
++    },
++  });
++
++  await logAudit("settings.update", "tournament_settings", 1);
++  revalidatePath("/admin/settings");
++  revalidatePath("/admin/players");
++}
++
++/** Generates and persists a stable license number the first time a player's license is created. */
++export async function ensureLicenseNumber(playerId: number): Promise<string> {
++  const player = await prisma.player.findUniqueOrThrow({
++    where: { id: playerId },
++    include: { team: { include: { university: true } } },
++  });
++
++  if (player.licenseNumber) return player.licenseNumber;
++
++  const shortName = player.team.university.shortName.toUpperCase().replace(/[^A-Z0-9]/g, "");
++  const countInTeam = await prisma.player.count({
++    where: { teamId: player.teamId, licenseNumber: { not: null } },
++  });
++  const sequence = String(countInTeam + 1).padStart(2, "0");
++  const licenseNumber = `UCUP2026-${shortName}-${sequence}`;
++
++  await prisma.player.update({ where: { id: playerId }, data: { licenseNumber } });
++  return licenseNumber;
++}
+diff --git a/lib/actions/timer.ts b/lib/actions/timer.ts
+index c9a9dab..9c5c504 100644
+--- a/lib/actions/timer.ts
++++ b/lib/actions/timer.ts
+@@ -49,6 +49,19 @@ export async function pauseTimer(matchId: number) {
+   await refresh(matchId);
+ }
+ 
++/** Explicit half-time break: freezes the timer AND sets status to "halftime" (shown distinctly on the public site). */
++export async function setHalftime(matchId: number) {
++  await requireAdmin();
++  const match = await prisma.match.findUniqueOrThrow({ where: { id: matchId } });
++  const elapsed = getElapsedSeconds(match);
++
++  await prisma.match.update({
++    where: { id: matchId },
++    data: { status: "halftime", elapsedTime: elapsed, timerPausedAt: new Date() },
++  });
++  await refresh(matchId);
++}
++
+ /** Resume: restart start_time from now, keep accumulated elapsed_time as base */
+ export async function resumeTimer(matchId: number) {
+   await requireAdmin();
+@@ -64,12 +77,38 @@ export async function stopTimer(matchId: number) {
+   await requireAdmin();
+   const match = await prisma.match.findUniqueOrThrow({ where: { id: matchId } });
+   const elapsed = getElapsedSeconds(match);
++  const wasAlreadyFinished = match.status === "finished";
+ 
+   await prisma.match.update({
+     where: { id: matchId },
+     data: { status: "finished", elapsedTime: elapsed, timerPausedAt: new Date() },
+   });
+ 
++  if (!wasAlreadyFinished) {
++    const [lineups, events] = await Promise.all([
++      prisma.matchLineup.findMany({ where: { matchId }, select: { playerId: true } }),
++      prisma.matchEvent.findMany({
++        where: { matchId },
++        select: { playerId: true, assistPlayerId: true, outPlayerId: true },
++      }),
++    ]);
++
++    const involved = new Set<number>();
++    for (const l of lineups) involved.add(l.playerId);
++    for (const e of events) {
++      involved.add(e.playerId);
++      if (e.assistPlayerId) involved.add(e.assistPlayerId);
++      if (e.outPlayerId) involved.add(e.outPlayerId);
++    }
++
++    if (involved.size > 0) {
++      await prisma.player.updateMany({
++        where: { id: { in: Array.from(involved) } },
++        data: { matchesPlayed: { increment: 1 } },
++      });
++    }
++  }
++
+   const { recalculateAllStandings } = await import("@/lib/standings");
+   await recalculateAllStandings();
+ 
+diff --git a/lib/hooks/usePushNotifications.ts b/lib/hooks/usePushNotifications.ts
+index fad8a3f..22c4f89 100644
+--- a/lib/hooks/usePushNotifications.ts
++++ b/lib/hooks/usePushNotifications.ts
+@@ -3,8 +3,9 @@
+ import { useCallback, useEffect, useState } from "react";
+ 
+ function urlBase64ToUint8Array(base64String: string) {
+-  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+-  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
++  const trimmed = base64String.trim();
++  const padding = "=".repeat((4 - (trimmed.length % 4)) % 4);
++  const base64 = (trimmed + padding).replace(/-/g, "+").replace(/_/g, "/");
+   const rawData = atob(base64);
+   return Uint8Array.from([...rawData].map((c) => c.charCodeAt(0)));
+ }
+@@ -12,6 +13,8 @@ function urlBase64ToUint8Array(base64String: string) {
+ export function usePushNotifications(favoriteIds: number[]) {
+   const [permission, setPermission] = useState<NotificationPermission | "unsupported">("default");
+   const [enabled, setEnabled] = useState(false);
++  const [error, setError] = useState<string | null>(null);
++  const [busy, setBusy] = useState(false);
+ 
+   const supported =
+     typeof window !== "undefined" && "serviceWorker" in navigator && "PushManager" in window;
+@@ -31,68 +34,111 @@ export function usePushNotifications(favoriteIds: number[]) {
+   const syncSubscription = useCallback(
+     async (teamIds: number[]) => {
+       if (!supported) return;
+-      const reg = await navigator.serviceWorker.getRegistration();
+-      const sub = await reg?.pushManager.getSubscription();
+-      if (!sub) return;
++      try {
++        const reg = await navigator.serviceWorker.getRegistration();
++        const sub = await reg?.pushManager.getSubscription();
++        if (!sub) return;
+ 
+-      const json = sub.toJSON();
+-      await fetch("/api/push/subscribe", {
+-        method: "POST",
+-        headers: { "Content-Type": "application/json" },
+-        body: JSON.stringify({ endpoint: json.endpoint, keys: json.keys, teamIds }),
+-      });
++        const json = sub.toJSON();
++        await fetch("/api/push/subscribe", {
++          method: "POST",
++          headers: { "Content-Type": "application/json" },
++          body: JSON.stringify({ endpoint: json.endpoint, keys: json.keys, teamIds }),
++        });
++      } catch (err) {
++        console.error("[push] échec de la synchronisation des favoris :", err);
++      }
+     },
+     [supported]
+   );
+ 
+-  // Keep the server's team list in sync whenever favorites change, as long
+-  // as push is already enabled for this browser.
+   useEffect(() => {
+     if (enabled) syncSubscription(favoriteIds);
+     // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, [favoriteIds.join(","), enabled]);
+ 
+   const enable = useCallback(async () => {
+-    if (!supported) return;
++    setError(null);
++
++    if (!supported) {
++      setError("Ton navigateur ne supporte pas les notifications push.");
++      return;
++    }
+ 
+     const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+     if (!publicKey) {
+-      alert("Les notifications push ne sont pas encore configurées sur ce site.");
++      setError(
++        "Les notifications ne sont pas configurées côté serveur (clé VAPID absente). " +
++          "Vérifie NEXT_PUBLIC_VAPID_PUBLIC_KEY dans .env, puis redémarre le serveur " +
++          "(cette variable est figée au build, un simple enregistrement du fichier ne suffit pas)."
++      );
+       return;
+     }
+ 
+-    const permissionResult = await Notification.requestPermission();
+-    setPermission(permissionResult);
+-    if (permissionResult !== "granted") return;
++    setBusy(true);
++    try {
++      const permissionResult = await Notification.requestPermission();
++      setPermission(permissionResult);
++      if (permissionResult !== "granted") {
++        setError(
++          permissionResult === "denied"
++            ? "Permission refusée. Autorise les notifications dans les réglages du navigateur pour ce site."
++            : "Permission non accordée."
++        );
++        return;
++      }
+ 
+-    const reg = await navigator.serviceWorker.register("/sw.js");
+-    const sub = await reg.pushManager.subscribe({
+-      userVisibleOnly: true,
+-      applicationServerKey: urlBase64ToUint8Array(publicKey),
+-    });
++      const reg = await navigator.serviceWorker.register("/sw.js");
++      await navigator.serviceWorker.ready;
+ 
+-    const json = sub.toJSON();
+-    await fetch("/api/push/subscribe", {
+-      method: "POST",
+-      headers: { "Content-Type": "application/json" },
+-      body: JSON.stringify({ endpoint: json.endpoint, keys: json.keys, teamIds: favoriteIds }),
+-    });
+-    setEnabled(true);
+-  }, [supported, favoriteIds]);
++      const sub = await reg.pushManager.subscribe({
++        userVisibleOnly: true,
++        applicationServerKey: urlBase64ToUint8Array(publicKey),
++      });
+ 
+-  const disable = useCallback(async () => {
+-    const reg = await navigator.serviceWorker.getRegistration();
+-    const sub = await reg?.pushManager.getSubscription();
+-    if (sub) {
+-      await fetch("/api/push/subscribe", {
+-        method: "DELETE",
++      const json = sub.toJSON();
++      const res = await fetch("/api/push/subscribe", {
++        method: "POST",
+         headers: { "Content-Type": "application/json" },
+-        body: JSON.stringify({ endpoint: sub.endpoint }),
++        body: JSON.stringify({ endpoint: json.endpoint, keys: json.keys, teamIds: favoriteIds }),
+       });
+-      await sub.unsubscribe();
++
++      if (!res.ok) {
++        const body = await res.json().catch(() => ({}));
++        throw new Error(body.error || `Le serveur a refusé l'abonnement (${res.status}).`);
++      }
++
++      setEnabled(true);
++    } catch (err) {
++      console.error("[push] échec de l'activation :", err);
++      setError(err instanceof Error ? err.message : "Impossible d'activer les notifications.");
++      setEnabled(false);
++    } finally {
++      setBusy(false);
++    }
++  }, [supported, favoriteIds]);
++
++  const disable = useCallback(async () => {
++    setBusy(true);
++    try {
++      const reg = await navigator.serviceWorker.getRegistration();
++      const sub = await reg?.pushManager.getSubscription();
++      if (sub) {
++        await fetch("/api/push/subscribe", {
++          method: "DELETE",
++          headers: { "Content-Type": "application/json" },
++          body: JSON.stringify({ endpoint: sub.endpoint }),
++        });
++        await sub.unsubscribe();
++      }
++      setEnabled(false);
++    } catch (err) {
++      console.error("[push] échec de la désactivation :", err);
++      setError(err instanceof Error ? err.message : "Impossible de désactiver les notifications.");
++    } finally {
++      setBusy(false);
+     }
+-    setEnabled(false);
+   }, []);
+ 
+-  return { supported, permission, enabled, enable, disable };
++  return { supported, permission, enabled, busy, error, enable, disable };
+ }
+diff --git a/lib/hooks/useRealtime.ts b/lib/hooks/useRealtime.ts
+index ad27f30..60059c9 100644
+--- a/lib/hooks/useRealtime.ts
++++ b/lib/hooks/useRealtime.ts
+@@ -1,6 +1,6 @@
+ "use client";
+ 
+-import { useEffect, useRef, useState } from "react";
++import { useCallback, useEffect, useRef, useState } from "react";
+ import Pusher from "pusher-js";
+ 
+ let sharedPusher: Pusher | null | undefined;
+@@ -20,10 +20,17 @@ function getPusherClient(): Pusher | null {
+ }
+ 
+ /**
+- * Fetches `url` once for the initial paint, then stays in sync via a Pusher
+- * channel event named "update" — falling back to a slow poll
+- * (`fallbackIntervalMs`, default 45s) so the page still self-heals if a
+- * push is ever missed or Pusher isn't configured at all.
++ * Fetches `url`, then stays in sync via a Pusher channel event named
++ * "update" — falling back to a slow poll (`fallbackIntervalMs`, default
++ * 45s) so the page still self-heals if a push is ever missed or Pusher
++ * isn't configured at all.
++ *
++ * Refetches immediately whenever `url` itself changes (e.g. switching
++ * between /matches?filter=live and ?filter=finished client-side) — without
++ * this, a component that doesn't unmount on navigation (same route, only
++ * searchParams differ) would keep showing whatever it last fetched until
++ * the next poll tick, which looked like the page being "stuck" until a
++ * manual refresh.
+  */
+ export function useRealtime<T>(
+   url: string,
+@@ -35,20 +42,25 @@ export function useRealtime<T>(
+   const urlRef = useRef(url);
+   urlRef.current = url;
+ 
+-  useEffect(() => {
+-    let cancelled = false;
+-
+-    async function fetchNow() {
+-      try {
+-        const res = await fetch(urlRef.current, { cache: "no-store" });
+-        if (!res.ok) return;
+-        const json = await res.json();
+-        if (!cancelled) setData(json);
+-      } catch {
+-        // transient network error — next tick/event will retry
+-      }
++  const fetchNow = useCallback(async () => {
++    try {
++      const res = await fetch(urlRef.current, { cache: "no-store" });
++      if (!res.ok) return;
++      const json = await res.json();
++      setData(json);
++    } catch {
++      // transient network error — next tick/event will retry
+     }
++  }, []);
+ 
++  // Refetch immediately whenever the URL changes.
++  useEffect(() => {
++    fetchNow();
++  }, [url, fetchNow]);
++
++  // Subscribe to push updates + keep a slow fallback poll running,
++  // independent of URL changes (no need to resubscribe on every filter switch).
++  useEffect(() => {
+     const pusher = getPusherClient();
+     const channel = pusher?.subscribe(channelName);
+     channel?.bind("update", fetchNow);
+@@ -56,14 +68,13 @@ export function useRealtime<T>(
+     const interval = setInterval(fetchNow, fallbackIntervalMs);
+ 
+     return () => {
+-      cancelled = true;
+       clearInterval(interval);
+       if (pusher && channel) {
+         channel.unbind("update", fetchNow);
+         pusher.unsubscribe(channelName);
+       }
+     };
+-  }, [channelName, fallbackIntervalMs]);
++  }, [channelName, fallbackIntervalMs, fetchNow]);
+ 
+   return data;
+ }
+diff --git a/lib/license.ts b/lib/license.ts
+new file mode 100644
+index 0000000..1f5803e
+--- /dev/null
++++ b/lib/license.ts
+@@ -0,0 +1,398 @@
++import { createCanvas, loadImage, type SKRSContext2D, type Canvas } from "@napi-rs/canvas";
++
++// Physical size target: 900x1260px @ ~300dpi ≈ 76x107mm — a standard
++// badge/student-card format, printable directly.
++export const CARD_WIDTH = 900;
++export const CARD_HEIGHT = 1260;
++
++const NAVY = "#0b1f3f";
++const RED = "#d51f2a";
++const RED_DARK = "#94121d";
++
++export type LicenseData = {
++  firstName: string;
++  lastName: string;
++  position: string;
++  nationality: string;
++  jerseyNumber: number;
++  licenseNumber: string;
++  teamName: string;
++  universityName: string;
++  universityShortName: string;
++  photo: string | null;
++  universityLogo: string | null;
++  tournamentLogo: string | null;
++  organizerName: string;
++  organizerSub: string | null;
++  issuedDate: string;
++};
++
++async function safeLoadImage(url: string | null) {
++  if (!url) return null;
++  try {
++    const res = await fetch(url);
++    if (!res.ok) return null;
++    const buffer = Buffer.from(await res.arrayBuffer());
++    return await loadImage(buffer);
++  } catch {
++    return null;
++  }
++}
++
++function roundRect(ctx: SKRSContext2D, x: number, y: number, w: number, h: number, r: number) {
++  ctx.beginPath();
++  ctx.moveTo(x + r, y);
++  ctx.arcTo(x + w, y, x + w, y + h, r);
++  ctx.arcTo(x + w, y + h, x, y + h, r);
++  ctx.arcTo(x, y + h, x, y, r);
++  ctx.arcTo(x, y, x + w, y, r);
++  ctx.closePath();
++}
++
++function drawDiagonalAccent(ctx: SKRSContext2D, headerHeight: number) {
++  ctx.fillStyle = RED;
++  ctx.beginPath();
++  ctx.moveTo(0, headerHeight);
++  ctx.lineTo(160, headerHeight);
++  ctx.lineTo(0, headerHeight - 90);
++  ctx.closePath();
++  ctx.fill();
++}
++
++function wrapText(ctx: SKRSContext2D, text: string, x: number, y: number, maxWidth: number, lineHeight: number) {
++  const words = text.split(" ");
++  let line = "";
++  let cursorY = y;
++
++  for (const word of words) {
++    const test = line ? `${line} ${word}` : word;
++    if (ctx.measureText(test).width > maxWidth && line) {
++      ctx.fillText(line, x, cursorY);
++      line = word;
++      cursorY += lineHeight;
++    } else {
++      line = test;
++    }
++  }
++  if (line) ctx.fillText(line, x, cursorY);
++  return cursorY + lineHeight;
++}
++
++function drawFallbackTournamentLogo(ctx: SKRSContext2D, cx: number, cy: number, r: number) {
++  ctx.save();
++  ctx.beginPath();
++  ctx.arc(cx, cy, r, 0, Math.PI * 2);
++  ctx.fillStyle = "rgba(255,255,255,0.12)";
++  ctx.fill();
++  ctx.strokeStyle = "white";
++  ctx.lineWidth = 3;
++  ctx.stroke();
++  ctx.fillStyle = "white";
++  ctx.font = `bold ${Math.round(r * 0.9)}px sans-serif`;
++  ctx.textAlign = "center";
++  ctx.textBaseline = "middle";
++  ctx.fillText("UCUP", cx, cy + 2);
++  ctx.restore();
++}
++
++async function drawInfoRow(
++  ctx: SKRSContext2D,
++  x: number,
++  y: number,
++  label: string,
++  value: string,
++  labelColor: string
++) {
++  ctx.fillStyle = NAVY;
++  ctx.beginPath();
++  ctx.arc(x + 18, y, 18, 0, Math.PI * 2);
++  ctx.fill();
++
++  ctx.fillStyle = labelColor;
++  ctx.font = "bold 20px sans-serif";
++  ctx.textAlign = "left";
++  ctx.textBaseline = "alphabetic";
++  ctx.fillText(label, x + 50, y + 6);
++
++  ctx.fillStyle = "#111111";
++  ctx.font = "bold 24px sans-serif";
++  ctx.fillText(value, x + 300, y + 7);
++
++  ctx.strokeStyle = "#e5e5e5";
++  ctx.lineWidth = 1;
++  ctx.beginPath();
++  ctx.moveTo(x, y + 26);
++  ctx.lineTo(x + CARD_WIDTH - 2 * x, y + 26);
++  ctx.stroke();
++}
++
++export async function renderLicenseFront(data: LicenseData): Promise<Canvas> {
++  const canvas = createCanvas(CARD_WIDTH, CARD_HEIGHT);
++  const ctx = canvas.getContext("2d");
++
++  ctx.fillStyle = "#f4f5f7";
++  ctx.fillRect(0, 0, CARD_WIDTH, CARD_HEIGHT);
++
++  const headerHeight = 230;
++  ctx.fillStyle = NAVY;
++  ctx.fillRect(0, 0, CARD_WIDTH, headerHeight);
++  drawDiagonalAccent(ctx, headerHeight);
++
++  const tournamentLogo = await safeLoadImage(data.tournamentLogo);
++  if (tournamentLogo) {
++    ctx.save();
++    ctx.beginPath();
++    ctx.arc(110, 115, 70, 0, Math.PI * 2);
++    ctx.clip();
++    ctx.drawImage(tournamentLogo, 40, 45, 140, 140);
++    ctx.restore();
++  } else {
++    drawFallbackTournamentLogo(ctx, 110, 115, 70);
++  }
++
++  ctx.strokeStyle = "rgba(255,255,255,0.4)";
++  ctx.lineWidth = 2;
++  ctx.beginPath();
++  ctx.moveTo(200, 55);
++  ctx.lineTo(200, 175);
++  ctx.stroke();
++
++  ctx.fillStyle = "white";
++  ctx.textAlign = "left";
++  ctx.font = "bold 34px sans-serif";
++  ctx.fillText("LICENCE DE JOUEUR", 225, 90);
++  ctx.font = "bold 15px sans-serif";
++  ctx.fillStyle = "rgba(255,255,255,0.85)";
++  ctx.fillText("CHAMPIONNAT UNIVERSITAIRE DE FOOTBALL", 225, 118);
++  ctx.font = "13px sans-serif";
++  ctx.fillStyle = "rgba(255,255,255,0.65)";
++  ctx.fillText("POINTE-NOIRE & BRAZZAVILLE", 225, 140);
++
++  const uniLogo = await safeLoadImage(data.universityLogo);
++  ctx.save();
++  ctx.beginPath();
++  ctx.arc(CARD_WIDTH - 90, 90, 55, 0, Math.PI * 2);
++  ctx.fillStyle = "white";
++  ctx.fill();
++  ctx.clip();
++  if (uniLogo) {
++    ctx.drawImage(uniLogo, CARD_WIDTH - 145, 35, 110, 110);
++  } else {
++    ctx.fillStyle = NAVY;
++    ctx.font = "bold 22px sans-serif";
++    ctx.textAlign = "center";
++    ctx.fillText(data.universityShortName.slice(0, 3), CARD_WIDTH - 90, 96);
++  }
++  ctx.restore();
++
++  const photoBox = { x: 225, y: 260, w: 450, h: 380 };
++  ctx.fillStyle = "white";
++  roundRect(ctx, photoBox.x - 6, photoBox.y - 6, photoBox.w + 12, photoBox.h + 12, 10);
++  ctx.fill();
++  ctx.strokeStyle = RED;
++  ctx.lineWidth = 4;
++  roundRect(ctx, photoBox.x, photoBox.y, photoBox.w, photoBox.h, 6);
++  ctx.stroke();
++
++  const photo = await safeLoadImage(data.photo);
++  ctx.save();
++  roundRect(ctx, photoBox.x, photoBox.y, photoBox.w, photoBox.h, 6);
++  ctx.clip();
++  if (photo) {
++    const scale = Math.max(photoBox.w / photo.width, photoBox.h / photo.height);
++    const dw = photo.width * scale;
++    const dh = photo.height * scale;
++    ctx.drawImage(photo, photoBox.x + (photoBox.w - dw) / 2, photoBox.y + (photoBox.h - dh) / 2, dw, dh);
++  } else {
++    ctx.fillStyle = "#d1d5db";
++    ctx.fillRect(photoBox.x, photoBox.y, photoBox.w, photoBox.h);
++    ctx.fillStyle = "#6b7280";
++    ctx.font = "bold 80px sans-serif";
++    ctx.textAlign = "center";
++    ctx.textBaseline = "middle";
++    ctx.fillText(`${data.firstName[0]}${data.lastName[0]}`, photoBox.x + photoBox.w / 2, photoBox.y + photoBox.h / 2);
++  }
++  ctx.restore();
++
++  const rows: [string, string][] = [
++    ["NOM(S)", data.lastName.toUpperCase()],
++    ["PRÉNOM(S)", data.firstName],
++    ["POSITION", data.position],
++    ["UNIVERSITÉ", data.universityShortName],
++    ["NUMÉRO LICENCE", data.licenseNumber],
++    ["ÉQUIPE", data.teamName],
++    ["VALIDITÉ", "Saison 2026"],
++  ];
++  let rowY = 700;
++  for (const [label, value] of rows) {
++    await drawInfoRow(ctx, 60, rowY, label, value, RED_DARK);
++    rowY += 48;
++  }
++
++  const footerY = rowY + 40;
++  ctx.fillStyle = "#111111";
++  ctx.font = "italic 22px sans-serif";
++  ctx.textAlign = "left";
++  ctx.fillText("Comité d'organisation", 60, footerY);
++  ctx.font = "bold 14px sans-serif";
++  ctx.fillStyle = "#6b7280";
++  ctx.fillText("COMITÉ D'ORGANISATION", 60, footerY + 26);
++  ctx.fillText("UCUP 2026", 60, footerY + 44);
++
++  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(
++    `${process.env.NEXT_PUBLIC_SITE_URL ?? ""}/players/verify/${data.licenseNumber}`
++  )}`;
++  const qrImage = await safeLoadImage(qrUrl);
++  if (qrImage) {
++    ctx.drawImage(qrImage, 370, footerY - 65, 130, 130);
++  }
++
++  ctx.save();
++  ctx.beginPath();
++  ctx.arc(770, footerY, 65, 0, Math.PI * 2);
++  ctx.fillStyle = NAVY;
++  ctx.fill();
++  ctx.restore();
++  ctx.fillStyle = "white";
++  ctx.textAlign = "center";
++  ctx.font = "bold 13px sans-serif";
++  ctx.fillText("UCUP", 770, footerY - 6);
++  ctx.fillText("2026", 770, footerY + 12);
++
++  ctx.fillStyle = NAVY;
++  ctx.fillRect(0, CARD_HEIGHT - 40, CARD_WIDTH, 40);
++  ctx.fillStyle = "white";
++  ctx.font = "bold 14px sans-serif";
++  ctx.textAlign = "center";
++  ctx.fillText("LA PASSION UNIVERSITAIRE, NOTRE FORCE", CARD_WIDTH / 2, CARD_HEIGHT - 15);
++
++  return canvas;
++}
++
++export async function renderLicenseBack(data: LicenseData): Promise<Canvas> {
++  const canvas = createCanvas(CARD_WIDTH, CARD_HEIGHT);
++  const ctx = canvas.getContext("2d");
++
++  ctx.fillStyle = "#f4f5f7";
++  ctx.fillRect(0, 0, CARD_WIDTH, CARD_HEIGHT);
++
++  const headerHeight = 180;
++  ctx.fillStyle = NAVY;
++  ctx.fillRect(0, 0, CARD_WIDTH, headerHeight);
++  drawDiagonalAccent(ctx, headerHeight);
++
++  const tournamentLogo = await safeLoadImage(data.tournamentLogo);
++  if (tournamentLogo) {
++    ctx.save();
++    ctx.beginPath();
++    ctx.arc(100, 90, 55, 0, Math.PI * 2);
++    ctx.clip();
++    ctx.drawImage(tournamentLogo, 45, 35, 110, 110);
++    ctx.restore();
++  } else {
++    drawFallbackTournamentLogo(ctx, 100, 90, 55);
++  }
++
++  ctx.fillStyle = "white";
++  ctx.textAlign = "left";
++  ctx.font = "bold 32px sans-serif";
++  ctx.fillText("LICENCE DE JOUEUR", 180, 90);
++  ctx.font = "16px sans-serif";
++  ctx.fillStyle = "rgba(255,255,255,0.8)";
++  ctx.fillText("SAISON 2026", 180, 120);
++
++  const panelX = 60;
++  const panelY = 220;
++  const panelW = CARD_WIDTH - 120;
++  const panelH = 300;
++  ctx.fillStyle = "white";
++  roundRect(ctx, panelX, panelY, panelW, panelH, 12);
++  ctx.fill();
++
++  ctx.fillStyle = RED;
++  roundRect(ctx, panelX + 24, panelY - 18, 300, 44, 22);
++  ctx.fill();
++  ctx.fillStyle = "white";
++  ctx.font = "bold 16px sans-serif";
++  ctx.textAlign = "left";
++  ctx.fillText("CONDITIONS D'UTILISATION", panelX + 44, panelY + 10);
++
++  const conditions = [
++    "Cette licence est strictement personnelle et valable uniquement pour le Championnat Universitaire de Football UCUP 2026.",
++    "Elle permet au joueur de participer aux rencontres officielles organisées dans le cadre du tournoi.",
++    "Toute utilisation frauduleuse, falsification ou prêt de cette licence entraîne des sanctions disciplinaires.",
++    "En cas de perte, veuillez contacter le comité d'organisation.",
++  ];
++
++  let condY = panelY + 60;
++  for (const cond of conditions) {
++    ctx.fillStyle = RED;
++    ctx.beginPath();
++    ctx.arc(panelX + 45, condY, 16, 0, Math.PI * 2);
++    ctx.fill();
++    ctx.fillStyle = "white";
++    ctx.font = "bold 14px sans-serif";
++    ctx.textAlign = "center";
++    ctx.fillText("OK", panelX + 45, condY + 5);
++
++    ctx.fillStyle = "#1f2937";
++    ctx.font = "16px sans-serif";
++    ctx.textAlign = "left";
++    condY = wrapText(ctx, cond, panelX + 75, condY - 6, panelW - 110, 22) + 12;
++  }
++
++  let y = panelY + panelH + 60;
++  ctx.fillStyle = RED;
++  ctx.font = "bold 15px sans-serif";
++  ctx.textAlign = "center";
++  ctx.fillText("ORGANISÉ PAR", CARD_WIDTH / 2, y);
++  y += 26;
++  ctx.fillStyle = "#111111";
++  ctx.font = "bold 18px sans-serif";
++  ctx.fillText(data.organizerName, CARD_WIDTH / 2, y);
++  if (data.organizerSub) {
++    y += 24;
++    ctx.fillStyle = "#6b7280";
++    ctx.font = "15px sans-serif";
++    ctx.fillText(data.organizerSub, CARD_WIDTH / 2, y);
++  }
++
++  y += 40;
++  const blockH = 130;
++  ctx.fillStyle = NAVY;
++  roundRect(ctx, panelX, y, panelW, blockH, 12);
++  ctx.fill();
++
++  const cols: [string, string][] = [
++    ["DATE D'ÉMISSION", data.issuedDate],
++    ["ÉMIS PAR", "Comité d'organisation"],
++    ["VALIDITÉ", "Saison 2026"],
++  ];
++  const colW = panelW / 3;
++  cols.forEach(([label, value], i) => {
++    const cx = panelX + colW * i + colW / 2;
++    ctx.fillStyle = "rgba(255,255,255,0.6)";
++    ctx.font = "bold 12px sans-serif";
++    ctx.textAlign = "center";
++    ctx.fillText(label, cx, y + 50);
++    ctx.fillStyle = "white";
++    ctx.font = "bold 16px sans-serif";
++    ctx.fillText(value, cx, y + 78);
++  });
++
++  y += blockH + 30;
++  ctx.fillStyle = RED;
++  roundRect(ctx, panelX, y, panelW, 56, 10);
++  ctx.fill();
++  ctx.fillStyle = "white";
++  ctx.font = "bold 16px sans-serif";
++  ctx.textAlign = "center";
++  ctx.fillText("NON TRANSFÉRABLE – DOCUMENT OFFICIEL DU TOURNOI", CARD_WIDTH / 2, y + 35);
++
++  return canvas;
++}
++
++export async function canvasToBuffer(canvas: Canvas, format: "png" | "jpeg"): Promise<Buffer> {
++  if (format === "jpeg") return canvas.encode("jpeg", 92);
++  return canvas.encode("png");
++}
+diff --git a/package.json b/package.json
+index 3037933..ce1bcfb 100644
+--- a/package.json
++++ b/package.json
+@@ -28,6 +28,7 @@
+     "resend": "^4.0.1",
+     "pdf-lib": "^1.17.1",
+     "web-push": "^3.6.7",
++    "@napi-rs/canvas": "^0.1.65",
+     "jose": "^5.9.6",
+     "bcryptjs": "^2.4.3",
+     "zod": "^3.24.1",
+diff --git a/prisma/schema.prisma b/prisma/schema.prisma
+index 95f8b75..b3eda40 100644
+--- a/prisma/schema.prisma
++++ b/prisma/schema.prisma
+@@ -98,6 +98,7 @@ model Player {
+   photoPath      String?  @map("photo_path")
+   nationality    String   @default("DRC")
+   status         PlayerStatus @default(approved)
++  licenseNumber  String?  @unique @map("license_number")
+ 
+   // Denormalized career stats
+   goals            Int @default(0)
+@@ -447,6 +448,20 @@ model NewsArticle {
+   @@map("news_articles")
+ }
+ 
++// =========================================================
++// TOURNAMENT SETTINGS (singleton, id is always 1)
++// =========================================================
++
++model TournamentSettings {
++  id            Int      @id @default(1)
++  logo          String?
++  organizerName String?  @default("Comité d'organisation UCUP 2026") @map("organizer_name")
++  organizerSub  String?  @map("organizer_sub")
++  updatedAt     DateTime @updatedAt @map("updated_at")
++
++  @@map("tournament_settings")
++}
++
+ // =========================================================
+ // SPONSORS
+ // =========================================================

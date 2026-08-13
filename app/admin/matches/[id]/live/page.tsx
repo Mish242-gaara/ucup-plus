@@ -4,6 +4,7 @@ import { getElapsedSeconds, formatElapsed } from "@/lib/elapsed-time";
 import {
   startTimer,
   pauseTimer,
+  setHalftime,
   resumeTimer,
   stopTimer,
   addAdditionalTime,
@@ -16,18 +17,26 @@ import ConfirmButton from "@/components/ConfirmButton";
 import WhatsAppShareLink from "@/components/WhatsAppShareLink";
 
 const EVENT_TYPES = [
-  "goal",
-  "penalty_goal",
-  "own_goal",
-  "yellow_card",
-  "second_yellow",
-  "red_card",
-  "substitution_in",
-  "substitution_out",
-  "injury",
-  "penalty_missed",
-  "big_chance_missed",
+  { value: "goal", label: "But" },
+  { value: "penalty_goal", label: "But sur penalty" },
+  { value: "own_goal", label: "But contre son camp" },
+  { value: "yellow_card", label: "Carton jaune" },
+  { value: "second_yellow", label: "Deuxième jaune (exclusion)" },
+  { value: "red_card", label: "Carton rouge" },
+  { value: "substitution_in", label: "Entrée en jeu" },
+  { value: "substitution_out", label: "Sortie du joueur" },
+  { value: "injury", label: "Blessure" },
+  { value: "penalty_missed", label: "Penalty manqué" },
+  { value: "big_chance_missed", label: "Grosse occasion manquée" },
 ];
+
+const STATUS_LABELS: Record<string, string> = {
+  scheduled: "À venir",
+  live: "En direct",
+  halftime: "Mi-temps",
+  finished: "Terminé",
+  postponed: "Reporté",
+};
 
 export default async function AdminLiveMatchPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -54,7 +63,7 @@ export default async function AdminLiveMatchPage({ params }: { params: Promise<{
         {match.homeTeam.name} {match.homeScore} - {match.awayScore} {match.awayTeam.name}
       </h1>
       <p className="mt-1 text-sm text-gray-400">
-        Statut : <span className="text-gray-300">{match.status}</span> · Temps :{" "}
+        Statut : <span className="text-gray-300">{STATUS_LABELS[match.status] ?? match.status}</span> · Temps :{" "}
         <span className="tabular-nums text-gray-300">{formatElapsed(elapsed)}</span>
         {match.timerPausedAt ? " (en pause)" : ""}
       </p>
@@ -75,7 +84,12 @@ export default async function AdminLiveMatchPage({ params }: { params: Promise<{
           </form>
           <form action={pauseTimer.bind(null, matchId)}>
             <button className="btn" type="submit">
-              Pause / Mi-temps
+              Pause
+            </button>
+          </form>
+          <form action={setHalftime.bind(null, matchId)}>
+            <button className="btn" type="submit">
+              Mi-temps
             </button>
           </form>
           <form action={resumeTimer.bind(null, matchId)}>
@@ -180,8 +194,8 @@ export default async function AdminLiveMatchPage({ params }: { params: Promise<{
 
           <select name="eventType" required className="input">
             {EVENT_TYPES.map((t) => (
-              <option key={t} value={t}>
-                {t}
+              <option key={t.value} value={t.value}>
+                {t.label}
               </option>
             ))}
           </select>
@@ -269,7 +283,9 @@ export default async function AdminLiveMatchPage({ params }: { params: Promise<{
                   className="flex items-center justify-between rounded-md border border-white/10 bg-zinc-900 px-3 py-2 text-sm"
                 >
                   <span>
-                    {row.item.minute}&apos; — {row.item.eventType} — {row.item.player.firstName}{" "}
+                    {row.item.minute}&apos; —{" "}
+                    {EVENT_TYPES.find((t) => t.value === row.item.eventType)?.label ?? row.item.eventType} —{" "}
+                    {row.item.player.firstName}{" "}
                     {row.item.player.lastName} ({row.item.team.name})
                   </span>
                   <form action={deleteEvent.bind(null, row.item.id)}>

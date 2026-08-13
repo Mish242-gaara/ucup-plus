@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Pusher from "pusher-js";
 
 let sharedPusher: Pusher | null | undefined;
@@ -20,10 +20,17 @@ function getPusherClient(): Pusher | null {
 }
 
 /**
- * Fetches `url` once for the initial paint, then stays in sync via a Pusher
- * channel event named "update" — falling back to a slow poll
- * (`fallbackIntervalMs`, default 45s) so the page still self-heals if a
- * push is ever missed or Pusher isn't configured at all.
+ * Fetches `url`, then stays in sync via a Pusher channel event named
+ * "update" — falling back to a slow poll (`fallbackIntervalMs`, default
+ * 45s) so the page still self-heals if a push is ever missed or Pusher
+ * isn't configured at all.
+ *
+ * Refetches immediately whenever `url` itself changes (e.g. switching
+ * between /matches?filter=live and ?filter=finished client-side) — without
+ * this, a component that doesn't unmount on navigation (same route, only
+ * searchParams differ) would keep showing whatever it last fetched until
+ * the next poll tick, which looked like the page being "stuck" until a
+ * manual refresh.
  */
 export function useRealtime<T>(
   url: string,
@@ -35,20 +42,25 @@ export function useRealtime<T>(
   const urlRef = useRef(url);
   urlRef.current = url;
 
-  useEffect(() => {
-    let cancelled = false;
-
-    async function fetchNow() {
-      try {
-        const res = await fetch(urlRef.current, { cache: "no-store" });
-        if (!res.ok) return;
-        const json = await res.json();
-        if (!cancelled) setData(json);
-      } catch {
-        // transient network error — next tick/event will retry
-      }
+  const fetchNow = useCallback(async () => {
+    try {
+      const res = await fetch(urlRef.current, { cache: "no-store" });
+      if (!res.ok) return;
+      const json = await res.json();
+      setData(json);
+    } catch {
+      // transient network error — next tick/event will retry
     }
+  }, []);
 
+  // Refetch immediately whenever the URL changes.
+  useEffect(() => {
+    fetchNow();
+  }, [url, fetchNow]);
+
+  // Subscribe to push updates + keep a slow fallback poll running,
+  // independent of URL changes (no need to resubscribe on every filter switch).
+  useEffect(() => {
     const pusher = getPusherClient();
     const channel = pusher?.subscribe(channelName);
     channel?.bind("update", fetchNow);
@@ -56,14 +68,13 @@ export function useRealtime<T>(
     const interval = setInterval(fetchNow, fallbackIntervalMs);
 
     return () => {
-      cancelled = true;
       clearInterval(interval);
       if (pusher && channel) {
         channel.unbind("update", fetchNow);
         pusher.unsubscribe(channelName);
       }
     };
-  }, [channelName, fallbackIntervalMs]);
+  }, [channelName, fallbackIntervalMs, fetchNow]);
 
   return data;
 }
