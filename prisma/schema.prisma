@@ -1,625 +1,515 @@
-"use client";
-
-import { useState } from "react";
-import { useSearchParams } from "next/navigation";
-import { Trophy, LayoutGrid, List, Info } from "lucide-react";
-import { useRealtime } from "@/lib/hooks/useRealtime";
-import TeamLogo from "@/components/TeamLogo";
-
-type LineupEntry = {
-  playerId: number;
-  playerName: string;
-  jerseyNumber: number;
-  position: string | null;
-  orderKey: number | null;
-  role: string;
-};
-
-type LiveData = {
-  status: string;
-  round: string | null;
-  group: string | null;
-  venue: string | null;
-  referee: string | null;
-  homeScore: number;
-  awayScore: number;
-  homeTeam: {
-    id?: number;
-    name: string;
-    logo: string | null;
-    formation: string | null;
-    coach?: string | null;
-    compositionReady: boolean;
-  };
-  awayTeam: {
-    id?: number;
-    name: string;
-    logo: string | null;
-    formation: string | null;
-    coach?: string | null;
-    compositionReady: boolean;
-  };
-  formattedTime: string;
-  isPaused: boolean;
-  isExtraTime: boolean;
-  isPenaltyShootout: boolean;
-  stats: Record<string, [number, number]>;
-  events: {
-    id: number;
-    eventType: string;
-    minute: number;
-    additionalTime: string | null;
-    teamId: number;
-    team: string;
-    player: string;
-    assistPlayer: string | null;
-    outPlayer: string | null;
-  }[];
-  commentary: { id: number; minute: number; text: string }[];
-  lineups: {
-    home: { starters: LineupEntry[]; substitutes: LineupEntry[] };
-    away: { starters: LineupEntry[]; substitutes: LineupEntry[] };
-  };
-};
-
-const EVENT_ICON: Record<string, string> = {
-  goal: "⚽",
-  penalty_goal: "⚽",
-  own_goal: "⚽",
-  yellow_card: "🟨",
-  second_yellow: "🟨🟥",
-  red_card: "🟥",
-  substitution: "🔄",
-  substitution_in: "🔄",
-  substitution_out: "🔄",
-  injury: "🩹",
-  penalty_missed: "❌",
-  big_chance_missed: "❌",
-};
-
-const TABS = ["Scores", "Stats", "Résumé", "Face-à-face", "Compositions"] as const;
-
-const TAB_PARAM: Record<string, (typeof TABS)[number]> = {
-  scores: "Scores",
-  stats: "Stats",
-  resume: "Résumé",
-  h2h: "Face-à-face",
-  compositions: "Compositions",
-};
-
-const STAT_LABELS: { key: string; label: string; suffix?: string }[] = [
-  { key: "possession", label: "Possession", suffix: "%" },
-  { key: "shotsOnTarget", label: "Tirs cadrés" },
-  { key: "shots", label: "Tirs totaux" },
-  { key: "fouls", label: "Fautes" },
-  { key: "corners", label: "Corners" },
-  { key: "offsides", label: "Hors-jeu" },
-  { key: "saves", label: "Arrêts" },
-];
-
-function StatBar({ label, home, away, suffix = "" }: { label: string; home: number; away: number; suffix?: string }) {
-  const total = home + away || 1;
-  const homePct = (home / total) * 100;
-
-  return (
-    <div className="py-2">
-      <div className="flex items-center justify-between text-sm font-semibold text-white">
-        <span>
-          {home}
-          {suffix}
-        </span>
-        <span className="text-gray-400">{label}</span>
-        <span>
-          {away}
-          {suffix}
-        </span>
-      </div>
-      <div className="mt-1.5 flex h-1.5 overflow-hidden rounded-full bg-white/10">
-        <div className="bg-brand-500" style={{ width: `${homePct}%` }} />
-        <div className="bg-white/40" style={{ width: `${100 - homePct}%` }} />
-      </div>
-    </div>
-  );
+generator client {
+  provider = "prisma-client-js"
 }
 
-function LineupColumn({
-  teamName,
-  coach,
-  data,
-}: {
-  teamName: string;
-  coach?: string | null;
-  data: { starters: LineupEntry[]; substitutes: LineupEntry[] };
-}) {
-  const starters = [...data.starters].sort((a, b) => (a.orderKey ?? 0) - (b.orderKey ?? 0));
-
-  return (
-    <div>
-      <div className="mb-3 flex items-center justify-between border-b border-white/10 pb-2">
-        <h3 className="font-bold text-white">{teamName}</h3>
-        {coach && <span className="text-xs text-gray-400">Entraîneur : {coach}</span>}
-      </div>
-
-      {starters.length === 0 ? (
-        <p className="mt-2 text-sm text-gray-500">Composition non publiée.</p>
-      ) : (
-        <ul className="space-y-1.5 text-sm">
-          {starters.map((p) => (
-            <li key={p.playerId} className="flex justify-between text-gray-200">
-              <span>
-                <strong className="text-brand-400">#{p.jerseyNumber}</strong> {p.playerName}
-              </span>
-              <span className="text-xs text-gray-500">{p.position}</span>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {data.substitutes.length > 0 && (
-        <>
-          <p className="mt-5 text-xs font-semibold uppercase tracking-wider text-gray-400">Remplaçants</p>
-          <ul className="mt-2 space-y-1 text-sm text-gray-400">
-            {data.substitutes.map((p) => (
-              <li key={p.playerId} className="flex justify-between">
-                <span>
-                  #{p.jerseyNumber} {p.playerName}
-                </span>
-                <span className="text-xs text-gray-600">{p.position}</span>
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
-    </div>
-  );
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
-/* ==========================================================================
-   Pitch Board Component (Terrain Tactique Visuel)
-   ========================================================================== */
-function PitchBoard({
-  formation = "4-3-3",
-  starters,
-  isHomeTeam = true,
-  compositionReady = true,
-}: {
-  formation: string | null;
-  starters: LineupEntry[];
-  isHomeTeam?: boolean;
-  compositionReady?: boolean;
-}) {
-  if (!compositionReady || starters.length === 0) {
-    return (
-      <div className="relative mx-auto flex aspect-[2/3] w-full max-w-md flex-col items-center justify-center rounded-2xl border-2 border-emerald-500/30 bg-emerald-950/80 p-6 text-center shadow-2xl backdrop-blur">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(#10b981_1px,transparent_1px)] [background-size:16px_16px] opacity-10" />
-        <Info size={40} className="mb-3 text-emerald-400 opacity-80" />
-        <p className="text-base font-bold text-white">Composition non disponible</p>
-        <p className="mt-1 text-xs text-emerald-200/70">
-          L&apos;entraîneur n&apos;a pas encore officialisé le 11 de départ pour cette équipe.
-        </p>
-      </div>
-    );
-  }
+// =========================================================
+// AUTH
+// =========================================================
 
-  // Conversion de la formation ("4-3-3", "4-2-3-1", etc.) en tableau de nombres
-  let parsedFormation: number[] = [4, 3, 3];
-  if (formation && formation.includes("-")) {
-    const parts = formation
-      .split("-")
-      .map((n) => parseInt(n.trim(), 10))
-      .filter((n) => !isNaN(n) && n > 0);
-    if (parts.length > 0) {
-      parsedFormation = parts;
-    }
-  }
+model User {
+  id                     Int       @id @default(autoincrement())
+  name                   String
+  email                  String    @unique
+  emailVerifiedAt        DateTime? @map("email_verified_at")
+  password               String
+  isAdmin                Boolean   @default(false) @map("is_admin")
+  themePreference        String    @default("system") @map("theme_preference")
+  twoFactorSecret        String?   @map("two_factor_secret")
+  twoFactorRecoveryCodes String?   @map("two_factor_recovery_codes")
+  twoFactorConfirmedAt   DateTime? @map("two_factor_confirmed_at")
+  createdAt              DateTime  @default(now()) @map("created_at")
+  updatedAt              DateTime  @updatedAt @map("updated_at")
 
-  const sortedStarters = [...starters].sort((a, b) => (a.orderKey ?? 0) - (b.orderKey ?? 0));
-  const keeper = sortedStarters[0];
-  const outfieldPlayers = sortedStarters.slice(1);
-
-  // Construction des lignes tactiques
-  const rows: LineupEntry[][] = [];
-  let index = 0;
-  parsedFormation.forEach((count) => {
-    rows.push(outfieldPlayers.slice(index, index + count));
-    index += count;
-  });
-
-  // En cas d'écart entre le schéma et le nombre de joueurs restants
-  if (index < outfieldPlayers.length) {
-    const remaining = outfieldPlayers.slice(index);
-    if (rows.length > 0) {
-      rows[rows.length - 1].push(...remaining);
-    } else {
-      rows.push(remaining);
-    }
-  }
-
-  // Inversion pour placer l'Attaque en haut et le Gardien en bas
-  const tacticalRows = [...rows].reverse();
-
-  const badgeBg = isHomeTeam
-    ? "bg-gradient-to-tr from-brand-600 to-brand-400 border-white text-white shadow-brand-500/50"
-    : "bg-gradient-to-tr from-zinc-100 to-zinc-300 border-zinc-900 text-zinc-950 shadow-zinc-400/50";
-
-  return (
-    <div className="relative mx-auto aspect-[2/3] w-full max-w-md overflow-hidden rounded-2xl border-2 border-emerald-500/30 bg-emerald-950/90 p-4 shadow-2xl backdrop-blur">
-      {/* Lignes & Motifs du Terrain */}
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(#10b981_1px,transparent_1px)] [background-size:16px_16px] opacity-10" />
-
-      {/* Surface d'attaque (Haut) */}
-      <div className="pointer-events-none absolute left-1/2 top-0 h-16 w-36 -translate-x-1/2 rounded-b-lg border-2 border-t-0 border-emerald-400/30 bg-emerald-500/5" />
-      <div className="pointer-events-none absolute left-1/2 top-16 h-10 w-20 -translate-x-1/2 rounded-b-full border-2 border-t-0 border-emerald-400/20" />
-
-      {/* Rond Central */}
-      <div className="pointer-events-none absolute left-0 top-1/2 w-full border-t-2 border-emerald-400/30" />
-      <div className="pointer-events-none absolute left-1/2 top-1/2 h-24 w-24 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-emerald-400/30" />
-
-      {/* Surface de défense (Bas) */}
-      <div className="pointer-events-none absolute bottom-0 left-1/2 h-16 w-36 -translate-x-1/2 rounded-t-lg border-2 border-b-0 border-emerald-400/30 bg-emerald-500/5" />
-      <div className="pointer-events-none absolute bottom-16 left-1/2 h-10 w-20 -translate-x-1/2 rounded-t-full border-2 border-b-0 border-emerald-400/20" />
-
-      {/* Disposition Tactique */}
-      <div className="relative z-10 flex h-full flex-col justify-between py-2">
-        {/* Attaque, Milieu, Défense (du haut vers le bas) */}
-        {tacticalRows.map((row, rIndex) => (
-          <div key={rIndex} className="flex justify-around items-center px-2">
-            {row.map((player) => (
-              <div key={player.playerId} className="group flex flex-col items-center">
-                <div
-                  className={`flex h-9 w-9 items-center justify-center rounded-full border-2 text-xs font-black shadow-md transition-transform group-hover:scale-110 ${badgeBg}`}
-                >
-                  {player.jerseyNumber}
-                </div>
-                <span className="mt-1 max-w-[80px] truncate rounded bg-black/80 px-1.5 py-0.5 text-center text-[10px] font-semibold text-white backdrop-blur">
-                  {player.playerName}
-                </span>
-              </div>
-            ))}
-          </div>
-        ))}
-
-        {/* Gardien de but (Bas du terrain) */}
-        <div className="flex justify-center">
-          {keeper && (
-            <div className="group flex flex-col items-center">
-              <div className="flex h-9 w-9 items-center justify-center rounded-full border-2 border-yellow-300 bg-amber-500 text-xs font-black text-black shadow-lg transition-transform group-hover:scale-110">
-                {keeper.jerseyNumber}
-              </div>
-              <span className="mt-1 max-w-[80px] truncate rounded bg-black/80 px-1.5 py-0.5 text-center text-[10px] font-semibold text-white backdrop-blur">
-                {keeper.playerName}
-              </span>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
+  @@map("users")
 }
 
-type H2HMatch = {
-  id: number;
-  matchDate: string;
-  homeTeamName: string;
-  awayTeamName: string;
-  homeScore: number;
-  awayScore: number;
-};
+// =========================================================
+// CORE ENTITIES
+// =========================================================
 
-export default function MatchCentre({
-  matchId,
-  initialData,
-  h2h,
-  h2hSummary,
-}: {
-  matchId: number;
-  initialData: LiveData;
-  h2h: H2HMatch[];
-  h2hSummary: { homeWins: number; awayWins: number; draws: number };
-}) {
-  const data = useRealtime<LiveData>(`/api/matches/${matchId}/live`, initialData, `match-${matchId}`);
-  const searchParams = useSearchParams();
-  const initialTab = TAB_PARAM[searchParams.get("tab") ?? ""] ?? "Scores";
-  const [tab, setTab] = useState<(typeof TABS)[number]>(initialTab);
+model University {
+  id          Int      @id @default(autoincrement())
+  name        String
+  shortName   String   @map("short_name")
+  logo        String?
+  colors      String?
+  city        String?
+  foundedYear Int?     @map("founded_year")
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
-  // Vue du terrain tactique
-  const [lineupViewMode, setLineupViewMode] = useState<"pitch" | "list">("pitch");
-  const [selectedPitchTeam, setSelectedPitchTeam] = useState<"home" | "away">("home");
+  teams Team[]
 
-  const isLive = data.status === "live" || data.status === "halftime";
-  const scorers = data.events.filter(
-    (e) => e.eventType === "goal" || e.eventType === "penalty_goal" || e.eventType === "own_goal"
-  );
-  const homeScorers = scorers.filter((e) => e.team === data.homeTeam.name);
-  const awayScorers = scorers.filter((e) => e.team === data.awayTeam.name);
+  @@map("universities")
+}
 
-  const activeTeam = selectedPitchTeam === "home" ? data.homeTeam : data.awayTeam;
-  const activeLineup = selectedPitchTeam === "home" ? data.lineups.home : data.lineups.away;
+model Team {
+  id           Int      @id @default(autoincrement())
+  universityId Int      @map("university_id")
+  name         String
+  coach        String?
+  captainId    Int?     @unique @map("captain_id")
+  category     String   @default("senior")
+  year         Int
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
 
-  return (
-    <div className="overflow-hidden rounded-2xl bg-zinc-950 shadow-2xl border border-white/10">
-      {/* En-tête du match */}
-      <div className="bg-gradient-to-r from-brand-800 via-brand-600 to-brand-700 px-6 py-4 text-center text-white">
-        <div className="mx-auto flex max-w-md items-center justify-center gap-3">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10">
-            <Trophy size={18} />
-          </span>
-          <div>
-            <p className="text-lg font-extrabold uppercase tracking-wide">
-              {isLive ? "Direct Live" : data.status === "finished" ? "Match terminé" : "À venir"}
-            </p>
-            <p className="text-xs uppercase tracking-widest text-brand-100">
-              {data.round ?? (data.group ? `Groupe ${data.group}` : "UCUP 2026")}
-            </p>
-          </div>
-        </div>
-      </div>
+  university University @relation(fields: [universityId], references: [id], onDelete: Cascade)
+  captain    Player?    @relation("TeamCaptain", fields: [captainId], references: [id], onDelete: SetNull)
+  players    Player[]   @relation("TeamPlayers")
 
-      {/* Navigation des Onglets */}
-      <div className="flex justify-center gap-1 border-b border-white/10 bg-zinc-900 px-4 overflow-x-auto">
-        {TABS.map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={
-              tab === t
-                ? "border-b-2 border-brand-500 px-4 py-3 text-sm font-bold uppercase tracking-wide text-white whitespace-nowrap"
-                : "px-4 py-3 text-sm font-semibold uppercase tracking-wide text-gray-500 hover:text-gray-300 whitespace-nowrap"
-            }
-          >
-            {t}
-          </button>
-        ))}
-      </div>
+  homeMatches Match[] @relation("HomeTeam")
+  awayMatches Match[] @relation("AwayTeam")
 
-      <div className="p-6">
-        {/* Onglet SCORES */}
-        {tab === "Scores" && (
-          <div>
-            <div className="flex items-center justify-center gap-2 text-sm font-semibold text-gray-300">
-              {isLive && <span className="h-2 w-2 animate-pulse rounded-full bg-red-500" />}
-              <span>
-                {data.status === "finished"
-                  ? "Terminé"
-                  : data.status === "scheduled"
-                    ? "À venir"
-                    : `${data.formattedTime}${data.isPaused ? " (pause)" : ""}`}
-              </span>
-              {data.isExtraTime && <span className="text-brand-400">· Prolongation</span>}
-              {data.isPenaltyShootout && <span className="text-brand-400">· Tirs au but</span>}
-            </div>
+  matchEvents  MatchEvent[]
+  standings    Standing[]
+  matchLineups MatchLineup[]
+  newsArticles NewsArticle[]
+  lineups      Lineup[]
 
-            <div className="mt-4 grid grid-cols-3 items-center gap-4">
-              <div className="flex flex-col items-center gap-2 text-center">
-                <TeamLogo name={data.homeTeam.name} logo={data.homeTeam.logo} size={56} />
-                <p className="text-sm font-semibold text-white">{data.homeTeam.name}</p>
-              </div>
-              <p className="text-center text-5xl font-extrabold text-white">
-                {data.homeScore} - {data.awayScore}
-              </p>
-              <div className="flex flex-col items-center gap-2 text-center">
-                <TeamLogo name={data.awayTeam.name} logo={data.awayTeam.logo} size={56} />
-                <p className="text-sm font-semibold text-white">{data.awayTeam.name}</p>
-              </div>
-            </div>
+  @@map("teams")
+}
 
-            <div className="mt-6 grid grid-cols-2 gap-4 text-xs text-gray-400">
-              <ul className="space-y-1">
-                {homeScorers.map((e) => (
-                  <li key={e.id}>
-                    ⚽ {e.player} {e.minute}&apos;
-                  </li>
-                ))}
-              </ul>
-              <ul className="space-y-1 text-right">
-                {awayScorers.map((e) => (
-                  <li key={e.id}>
-                    ⚽ {e.player} {e.minute}&apos;
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        )}
+enum PlayerStatus {
+  pending
+  approved
+  rejected
 
-        {/* Onglet STATS */}
-        {tab === "Stats" && (
-          <div className="divide-y divide-white/5">
-            {STAT_LABELS.map(({ key, label, suffix }) => (
-              <StatBar
-                key={key}
-                label={label}
-                home={data.stats[key]?.[0] ?? 0}
-                away={data.stats[key]?.[1] ?? 0}
-                suffix={suffix}
-              />
-            ))}
-            <StatBar
-              label="Cartons"
-              home={(data.stats.yellowCards?.[0] ?? 0) + (data.stats.redCards?.[0] ?? 0) * 2}
-              away={(data.stats.yellowCards?.[1] ?? 0) + (data.stats.redCards?.[1] ?? 0) * 2}
-            />
-          </div>
-        )}
+  @@map("player_status")
+}
 
-        {/* Onglet RÉSUMÉ */}
-        {tab === "Résumé" && (
-          <ul className="space-y-3">
-            {data.events.length === 0 && data.commentary.length === 0 && (
-              <p className="text-center py-4 text-sm text-gray-500">Aucun événement répertorié pour ce match.</p>
-            )}
-            {[
-              ...data.events.map((e) => ({ kind: "event" as const, minute: e.minute, sortKey: e.minute * 10, data: e })),
-              ...data.commentary.map((c) => ({ kind: "comment" as const, minute: c.minute, sortKey: c.minute * 10 + 1, data: c })),
-            ]
-              .sort((a, b) => a.sortKey - b.sortKey)
-              .map((item) =>
-                item.kind === "event" ? (
-                  <li key={`e-${item.data.id}`} className="flex items-center gap-3 text-sm">
-                    <span className="w-10 shrink-0 text-gray-500 font-mono">
-                      {item.data.minute}
-                      {item.data.additionalTime ? `+${item.data.additionalTime}` : ""}&apos;
-                    </span>
-                    <span>{EVENT_ICON[item.data.eventType] ?? "•"}</span>
-                    <span className="text-gray-200">
-                      <span className="font-semibold text-white">{item.data.player}</span>
-                      {item.data.assistPlayer && (
-                        <span className="text-gray-400"> (passe : {item.data.assistPlayer})</span>
-                      )}
-                      {item.data.outPlayer && <span className="text-gray-400"> ↔ {item.data.outPlayer}</span>}
-                      <span className="ml-2 text-xs text-gray-500">— {item.data.team}</span>
-                    </span>
-                  </li>
-                ) : (
-                  <li key={`c-${item.data.id}`} className="flex items-start gap-3 text-sm">
-                    <span className="w-10 shrink-0 text-gray-500 font-mono">{item.data.minute}&apos;</span>
-                    <span className="text-gray-400">💬</span>
-                    <span className="italic text-gray-300">{item.data.text}</span>
-                  </li>
-                )
-              )}
-          </ul>
-        )}
+model Player {
+  id            Int          @id @default(autoincrement())
+  teamId        Int          @map("team_id")
+  firstName     String       @map("first_name")
+  lastName      String       @map("last_name")
+  jerseyNumber  Int          @map("jersey_number")
+  position      String
+  birthDate     DateTime?    @map("birth_date")
+  height        Int?
+  photo         String?
+  photoPath     String?      @map("photo_path")
+  nationality   String       @default("DRC")
+  status        PlayerStatus @default(approved)
+  licenseNumber String?      @unique @map("license_number")
 
-        {/* Onglet FACE-À-FACE */}
-        {tab === "Face-à-face" && (
-          <div>
-            <div className="flex items-center justify-around text-center text-sm">
-              <div>
-                <p className="text-2xl font-extrabold text-white">{h2hSummary.homeWins}</p>
-                <p className="text-xs text-gray-500">{data.homeTeam.name}</p>
-              </div>
-              <div>
-                <p className="text-2xl font-extrabold text-gray-400">{h2hSummary.draws}</p>
-                <p className="text-xs text-gray-500">Nuls</p>
-              </div>
-              <div>
-                <p className="text-2xl font-extrabold text-white">{h2hSummary.awayWins}</p>
-                <p className="text-xs text-gray-500">{data.awayTeam.name}</p>
-              </div>
-            </div>
+  // Denormalized career stats
+  goals           Int @default(0)
+  assists         Int @default(0)
+  yellowCards     Int @default(0) @map("yellow_cards")
+  redCards        Int @default(0) @map("red_cards")
+  matchesPlayed   Int @default(0) @map("matches_played")
+  minutesPlayed   Int @default(0) @map("minutes_played")
+  passesCompleted Int @default(0) @map("passes_completed")
+  passAccuracy    Int @default(0) @map("pass_accuracy")
+  tackles         Int @default(0)
+  interceptions   Int @default(0)
+  foulsCommitted  Int @default(0) @map("fouls_committed")
+  foulsSuffered   Int @default(0) @map("fouls_suffered")
+  shotsOnTarget   Int @default(0) @map("shots_on_target")
+  dribbles        Int @default(0)
 
-            <div className="mt-6 space-y-2">
-              {h2h.length === 0 ? (
-                <p className="text-center py-4 text-sm text-gray-500">Ces deux équipes ne se sont pas encore affrontées.</p>
-              ) : (
-                h2h.map((m) => (
-                  <div
-                    key={m.id}
-                    className="flex items-center justify-between rounded-lg bg-white/5 px-3 py-2 text-sm border border-white/5"
-                  >
-                    <span className="text-xs text-gray-400">
-                      {new Date(m.matchDate).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" })}
-                    </span>
-                    <span className="text-white">
-                      {m.homeTeamName} <span className="font-bold text-brand-400">{m.homeScore} - {m.awayScore}</span> {m.awayTeamName}
-                    </span>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        )}
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
-        {/* Onglet COMPOSITIONS */}
-        {tab === "Compositions" && (
-          <div className="space-y-6">
-            {/* Contrôles de Vue (Pitch vs Liste & Choix d'Équipe) */}
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-zinc-900/80 p-3 border border-white/5">
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setSelectedPitchTeam("home")}
-                  className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-colors ${
-                    selectedPitchTeam === "home" ? "bg-brand-500 text-white" : "bg-white/5 text-gray-400 hover:text-white"
-                  }`}
-                >
-                  {data.homeTeam.name}
-                </button>
-                <button
-                  onClick={() => setSelectedPitchTeam("away")}
-                  className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-colors ${
-                    selectedPitchTeam === "away" ? "bg-brand-500 text-white" : "bg-white/5 text-gray-400 hover:text-white"
-                  }`}
-                >
-                  {data.awayTeam.name}
-                </button>
-              </div>
+  team          Team  @relation("TeamPlayers", fields: [teamId], references: [id], onDelete: Cascade)
+  captainOfTeam Team? @relation("TeamCaptain")
 
-              <div className="flex items-center gap-1 rounded-lg bg-black/40 p-1">
-                <button
-                  onClick={() => setLineupViewMode("pitch")}
-                  className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold ${
-                    lineupViewMode === "pitch" ? "bg-brand-500 text-white" : "text-gray-400 hover:text-white"
-                  }`}
-                >
-                  <LayoutGrid size={14} />
-                  Terrain
-                </button>
-                <button
-                  onClick={() => setLineupViewMode("list")}
-                  className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold ${
-                    lineupViewMode === "list" ? "bg-brand-500 text-white" : "text-gray-400 hover:text-white"
-                  }`}
-                >
-                  <List size={14} />
-                  Liste
-                </button>
-              </div>
-            </div>
+  eventsAsPlayer    MatchEvent[]  @relation("EventPlayer")
+  eventsAsAssist    MatchEvent[]  @relation("EventAssist")
+  eventsAsOutPlayer MatchEvent[]  @relation("EventOutPlayer")
+  matchLineups      MatchLineup[]
+  lineups           Lineup[]
 
-            {/* Mode TERRAIN VISUEL */}
-            {lineupViewMode === "pitch" ? (
-              <div className="space-y-4">
-                <div className="text-center">
-                  <p className="text-base font-bold text-white">{activeTeam.name}</p>
-                  <div className="flex justify-center gap-4 text-xs text-gray-400 mt-0.5">
-                    <span>Formation : <strong className="text-brand-400">{activeTeam.formation ?? "4-3-3"}</strong></span>
-                    {activeTeam.coach && <span>Entraîneur : {activeTeam.coach}</span>}
-                  </div>
-                </div>
+  @@map("players")
+}
 
-                <PitchBoard
-                  formation={activeTeam.formation}
-                  starters={activeLineup.starters}
-                  isHomeTeam={selectedPitchTeam === "home"}
-                  compositionReady={activeTeam.compositionReady}
-                />
+// =========================================================
+// MATCHES
+// =========================================================
 
-                {/* Section Remplaçants sous le Pitch */}
-                {activeLineup.substitutes.length > 0 && (
-                  <div className="rounded-xl bg-zinc-900/60 p-4 border border-white/5">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">Remplaçants</p>
-                    <div className="grid grid-cols-2 gap-2 text-sm text-gray-300 sm:grid-cols-3">
-                      {activeLineup.substitutes.map((p) => (
-                        <div key={p.playerId} className="flex items-center gap-2">
-                          <span className="flex h-5 w-5 items-center justify-center rounded bg-white/10 text-[10px] font-bold text-gray-300">
-                            #{p.jerseyNumber}
-                          </span>
-                          <span className="truncate">{p.playerName}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            ) : (
-              /* Mode LISTE DÉTAILLÉE (Deux colonnes) */
-              <div className="grid gap-8 sm:grid-cols-2">
-                <LineupColumn
-                  teamName={data.homeTeam.name}
-                  coach={data.homeTeam.coach}
-                  data={data.lineups.home}
-                />
-                <LineupColumn
-                  teamName={data.awayTeam.name}
-                  coach={data.awayTeam.coach}
-                  data={data.lineups.away}
-                />
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
-  );
+enum MatchStatus {
+  scheduled
+  live
+  halftime
+  finished
+  postponed
+
+  @@map("match_status")
+}
+
+enum MatchType {
+  tournament
+  friendly
+
+  @@map("match_type")
+}
+
+model Match {
+  id          Int         @id @default(autoincrement())
+  homeTeamId  Int         @map("home_team_id")
+  awayTeamId  Int         @map("away_team_id")
+  matchDate   DateTime    @map("match_date")
+  venue       String?
+  status      MatchStatus @default(scheduled)
+
+  homeScore Int @default(0) @map("home_score")
+  awayScore Int @default(0) @map("away_score")
+
+  homeCoach String? @map("home_coach")
+  awayCoach String? @map("away_coach")
+
+  homeFormation String? @map("home_formation")
+  awayFormation String? @map("away_formation")
+
+  homeCompositionReady Boolean @default(false) @map("home_composition_ready")
+  awayCompositionReady Boolean @default(false) @map("away_composition_ready")
+
+  round           String?
+  bracketRound    Int?    @map("bracket_round")
+  bracketPosition Int?    @map("bracket_position")
+  group           String?
+  matchType       MatchType? @default(tournament) @map("match_type")
+  attendance      Int?
+
+  startTime     DateTime? @map("start_time")
+  timerPausedAt DateTime? @map("timer_paused_at")
+
+  elapsedTime              Int?     @default(0) @map("elapsed_time")
+  additionalTimeFirstHalf  Int?     @default(0) @map("additional_time_first_half")
+  additionalTimeSecondHalf Int?     @default(0) @map("additional_time_second_half")
+  isExtraTime              Boolean? @default(false) @map("is_extra_time")
+  isPenaltyShootout        Boolean? @default(false) @map("is_penalty_shootout")
+
+  // Aggregated / manual stats
+  homeFouls    Int @default(0) @map("home_fouls")
+  homeCorners  Int @default(0) @map("home_corners")
+  homeOffsides Int @default(0) @map("home_offsides")
+  awayFouls    Int @default(0) @map("away_fouls")
+  awayCorners  Int @default(0) @map("away_corners")
+  awayOffsides Int @default(0) @map("away_offsides")
+
+  homeYellowCards Int @default(0) @map("home_yellow_cards")
+  homeRedCards    Int @default(0) @map("home_red_cards")
+  awayYellowCards Int @default(0) @map("away_yellow_cards")
+  awayRedCards    Int @default(0) @map("away_red_cards")
+
+  homePossession Int? @map("home_possession")
+  awayPossession Int? @map("away_possession")
+
+  homeShots         Int  @default(0) @map("home_shots")
+  awayShots         Int  @default(0) @map("away_shots")
+  homeShotsOnTarget Int? @default(0) @map("home_shots_on_target")
+  awayShotsOnTarget Int? @default(0) @map("away_shots_on_target")
+
+  homeSaves     Int @default(0) @map("home_saves")
+  awaySaves     Int @default(0) @map("away_saves")
+  homeFreeKicks Int @default(0) @map("home_free_kicks")
+  awayFreeKicks Int @default(0) @map("away_free_kicks")
+  homeThrowIns  Int @default(0) @map("home_throw_ins")
+  awayThrowIns  Int @default(0) @map("away_throw_ins")
+  homeGoalkicks Int @default(0) @map("home_goalkicks")
+  awayGoalkicks Int @default(0) @map("away_goalkicks")
+  homePenalties Int @default(0) @map("home_penalties")
+  awayPenalties Int @default(0) @map("away_penalties")
+
+  referee     String?
+  weather     String?
+  temperature Int?
+  humidity    Int?
+  adminNotes  String? @map("admin_notes")
+  matchReport String? @map("match_report")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  homeTeam Team @relation("HomeTeam", fields: [homeTeamId], references: [id], onDelete: Cascade)
+  awayTeam Team @relation("AwayTeam", fields: [awayTeamId], references: [id], onDelete: Cascade)
+
+  events       MatchEvent[]
+  commentary   MatchCommentary[]
+  matchLineups MatchLineup[]
+  lineups      Lineup[]
+
+  @@map("matches")
+}
+
+enum MatchEventType {
+  goal
+  penalty_goal
+  own_goal
+  yellow_card
+  second_yellow
+  red_card
+  substitution
+  substitution_in
+  substitution_out
+  injury
+  penalty_missed
+  big_chance_missed
+
+  @@map("match_event_type")
+}
+
+model MatchEvent {
+  id             Int            @id @default(autoincrement())
+  matchId        Int            @map("match_id")
+  teamId         Int            @map("team_id")
+  playerId       Int            @map("player_id")
+  assistPlayerId Int?           @map("assist_player_id")
+  outPlayerId    Int?           @map("out_player_id")
+  eventType      MatchEventType @map("event_type")
+  minute         Int
+  additionalTime String?        @map("additional_time")
+  description    String?
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+
+  match        Match   @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  team         Team    @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  player       Player  @relation("EventPlayer", fields: [playerId], references: [id], onDelete: Cascade)
+  assistPlayer Player? @relation("EventAssist", fields: [assistPlayerId], references: [id], onDelete: SetNull)
+  outPlayer    Player? @relation("EventOutPlayer", fields: [outPlayerId], references: [id], onDelete: SetNull)
+
+  @@map("match_events")
+}
+
+model PushSubscription {
+  id        Int      @id @default(autoincrement())
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  teamIds   Int[]    @map("team_ids")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("push_subscriptions")
+}
+
+model MatchCommentary {
+  id        Int      @id @default(autoincrement())
+  matchId   Int      @map("match_id")
+  minute    Int
+  text      String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  match Match @relation(fields: [matchId], references: [id], onDelete: Cascade)
+
+  @@map("match_commentary")
+}
+
+// =========================================================
+// LINEUPS
+// =========================================================
+
+enum LineupRole {
+  starter
+  substitute
+
+  @@map("lineup_role")
+}
+
+model MatchLineup {
+  id               Int        @id @default(autoincrement())
+  matchId          Int        @map("match_id")
+  teamId           Int        @map("team_id")
+  playerId         Int        @map("player_id")
+  role             LineupRole
+  startingPosition String?    @map("starting_position")
+  orderKey         Int?       @map("order_key")
+  isStarter        Boolean    @default(false) @map("is_starter")
+  position         String?
+  createdAt        DateTime   @default(now()) @map("created_at")
+  updatedAt        DateTime   @updatedAt @map("updated_at")
+
+  match  Match  @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  team   Team   @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@unique([matchId, playerId])
+  @@map("match_lineups")
+}
+
+model Lineup {
+  id            Int      @id @default(autoincrement())
+  matchId       Int      @map("match_id")
+  teamId        Int      @map("team_id")
+  playerId      Int      @map("player_id")
+  role          String?
+  matchPosition String?  @map("match_position")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  match  Match  @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  team   Team   @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@unique([matchId, playerId])
+  @@map("lineups")
+}
+
+// =========================================================
+// STANDINGS
+// =========================================================
+
+model Standing {
+  id             Int      @id @default(autoincrement())
+  teamId         Int      @map("team_id")
+  group          String?
+  played         Int      @default(0)
+  won            Int      @default(0)
+  drawn          Int      @default(0)
+  lost           Int      @default(0)
+  goalsFor       Int      @default(0) @map("goals_for")
+  goalsAgainst   Int      @default(0) @map("goals_against")
+  goalDifference Int      @default(0) @map("goal_difference")
+  points         Int      @default(0)
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, group])
+  @@map("standings")
+}
+
+model AuditLog {
+  id         Int      @id @default(autoincrement())
+  actorEmail String   @map("actor_email")
+  action     String
+  entityType String   @map("entity_type")
+  entityId   Int?     @map("entity_id")
+  detail     String?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([entityType, entityId])
+  @@map("audit_logs")
+}
+
+model RateLimitAttempt {
+  id        Int      @id @default(autoincrement())
+  key       String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([key, createdAt])
+  @@map("rate_limit_attempts")
+}
+
+// =========================================================
+// GALLERY
+// =========================================================
+
+enum MediaType {
+  image
+  video
+
+  @@map("media_type")
+}
+
+model GalleryItem {
+  id          Int       @id @default(autoincrement())
+  title       String?
+  description String?
+  filePath    String    @map("file_path")
+  mediaType   MediaType @map("media_type")
+  sortOrder   Int       @default(0) @map("sort_order")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@map("gallery_items")
+}
+
+// =========================================================
+// NEWS
+// =========================================================
+
+model NewsArticle {
+  id          Int       @id @default(autoincrement())
+  title       String
+  slug        String    @unique
+  excerpt     String?
+  content     String
+  coverImage  String?   @map("cover_image")
+  teamId      Int?      @map("team_id")
+  published   Boolean   @default(false)
+  publishedAt DateTime? @map("published_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  team Team? @relation(fields: [teamId], references: [id], onDelete: SetNull)
+
+  @@map("news_articles")
+}
+
+// =========================================================
+// TOURNAMENT SETTINGS
+// =========================================================
+
+model TournamentSettings {
+  id            Int      @id @default(1)
+  logo          String?
+  organizerName String?  @default("Comité d'organisation UCUP 2026") @map("organizer_name")
+  organizerSub  String?  @map("organizer_sub")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@map("tournament_settings")
+}
+
+// =========================================================
+// SPONSORS
+// =========================================================
+
+model Sponsor {
+  id         Int      @id @default(autoincrement())
+  name       String
+  logo       String
+  websiteUrl String?  @map("website_url")
+  sortOrder  Int      @default(0) @map("sort_order")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@map("sponsors")
+}
+
+// =========================================================
+// CMS & DYNAMIC HOME CONTENT
+// =========================================================
+
+model Announcement {
+  id        Int      @id @default(autoincrement())
+  text      String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("announcements")
+}
+
+model Poll {
+  id        Int          @id @default(autoincrement())
+  question  String
+  active    Boolean      @default(true)
+  createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime     @updatedAt @map("updated_at")
+  options   PollOption[]
+
+  @@map("polls")
+}
+
+model PollOption {
+  id     Int    @id @default(autoincrement())
+  label  String
+  votes  Int    @default(0)
+  pollId Int    @map("poll_id")
+
+  poll Poll @relation(fields: [pollId], references: [id], onDelete: Cascade)
+
+  @@map("poll_options")
 }
