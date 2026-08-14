@@ -183,6 +183,9 @@ function PlayerNode({ player }: { player: LineupEntry }) {
 /* ==========================================================================
    Terrain Tactique Visuel Complet (Les 2 Équipes en Vis-à-Vis)
    ========================================================================== */
+/* ==========================================================================
+   Terrain Tactique Visuel Complet (Les 2 Équipes dans leur camp respectif)
+   ========================================================================== */
 function DualFacingPitch({
   homeTeam,
   awayTeam,
@@ -233,21 +236,23 @@ function DualFacingPitch({
       <div className="pointer-events-none absolute top-20 left-1/2 h-10 w-24 -translate-x-1/2 rounded-b-full border border-t-0 border-slate-500/20" />
 
       {/* Ligne Médiane & Rond Central */}
-      <div className="pointer-events-none absolute top-1/2 left-0 w-full border-t border-slate-500/30" />
-      <div className="pointer-events-none absolute top-1/2 left-1/2 h-28 w-28 -translate-x-1/2 -translate-y-1/2 rounded-full border border-slate-500/30" />
+      <div className="pointer-events-none absolute top-1/2 left-0 w-full border-t border-slate-500/40" />
+      <div className="pointer-events-none absolute top-1/2 left-1/2 h-28 w-28 -translate-x-1/2 -translate-y-1/2 rounded-full border border-slate-500/40" />
 
       {/* Surface Bas */}
       <div className="pointer-events-none absolute bottom-0 left-1/2 h-20 w-44 -translate-x-1/2 rounded-t-xl border border-b-0 border-slate-500/30 bg-slate-500/5" />
       <div className="pointer-events-none absolute bottom-0 left-1/2 h-8 w-20 -translate-x-1/2 rounded-t-md border border-b-0 border-slate-500/30" />
       <div className="pointer-events-none absolute bottom-20 left-1/2 h-10 w-24 -translate-x-1/2 rounded-t-full border border-b-0 border-slate-500/20" />
 
-      {/* Joueurs sur le terrain */}
-      <div className="relative z-10 flex min-h-[620px] flex-col justify-between py-2 sm:min-h-[700px]">
-        {/* HAUT : Domicile */}
-        <div className="flex flex-col gap-5 sm:gap-6">
-          <div className="flex justify-center">
+      {/* Structure strict à 2 demi-terrains */}
+      <div className="relative z-10 flex min-h-[640px] flex-col justify-between sm:min-h-[720px]">
+        {/* MOITIÉ HAUT : Équipe Domicile (Attaque vers le bas) */}
+        <div className="flex h-1/2 flex-col justify-between pb-3">
+          {/* Gardien */}
+          <div className="flex justify-center pt-1">
             {homeKeeper && <PlayerNode player={homeKeeper} />}
           </div>
+          {/* Lignes de champ (Défenseurs -> Milieux -> Attaquants) */}
           {homeRows.map((row, rIdx) => (
             <div key={`home-row-${rIdx}`} className="flex items-center justify-around px-2">
               {row.map((p) => (
@@ -257,11 +262,13 @@ function DualFacingPitch({
           ))}
         </div>
 
-        {/* BAS : Extérieur */}
-        <div className="flex flex-col-reverse gap-5 sm:gap-6">
-          <div className="flex justify-center">
+        {/* MOITIÉ BAS : Équipe Extérieur (Attaque vers le haut) */}
+        <div className="flex h-1/2 flex-col-reverse justify-between pt-3">
+          {/* Gardien */}
+          <div className="flex justify-center pb-1">
             {awayKeeper && <PlayerNode player={awayKeeper} />}
           </div>
+          {/* Lignes de champ (Défenseurs -> Milieux -> Attaquants) */}
           {awayRows.map((row, rIdx) => (
             <div key={`away-row-${rIdx}`} className="flex items-center justify-around px-2">
               {row.map((p) => (
@@ -274,7 +281,6 @@ function DualFacingPitch({
     </div>
   );
 }
-
 type H2HMatch = {
   id: number;
   matchDate: string;
