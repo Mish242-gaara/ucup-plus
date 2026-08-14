@@ -114,7 +114,8 @@ function LineupColumn({
   teamName: string;
   data: { starters: LineupEntry[]; substitutes: LineupEntry[] };
 }) {
-  const starters = [...data.starters].sort((a, b) => (a.orderKey ?? 0) - (b.orderKey ?? 0));
+  const starters = [...(data?.starters ?? [])].sort((a, b) => (a.orderKey ?? 0) - (b.orderKey ?? 0));
+  const substitutes = data?.substitutes ?? [];
 
   return (
     <div>
@@ -133,11 +134,11 @@ function LineupColumn({
           ))}
         </ul>
       )}
-      {data.substitutes.length > 0 && (
+      {substitutes.length > 0 && (
         <>
           <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-gray-500">Remplaçants</p>
           <ul className="mt-2 space-y-1 text-sm text-gray-400">
-            {data.substitutes.map((p) => (
+            {substitutes.map((p) => (
               <li key={p.playerId}>
                 #{p.jerseyNumber} {p.playerName}
               </li>
@@ -154,7 +155,7 @@ function LineupColumn({
    ========================================================================== */
 function PitchBoard({
   formation = "4-3-3",
-  starters,
+  starters = [],
   isHomeTeam = true,
 }: {
   formation: string | null;
@@ -184,17 +185,17 @@ function PitchBoard({
     <div className="relative mx-auto aspect-[2/3] w-full max-w-md overflow-hidden rounded-2xl border-2 border-emerald-500/30 bg-emerald-950/80 p-4 shadow-2xl backdrop-blur">
       {/* Texture du Terrain / Lignes de jeu */}
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(#10b981_1px,transparent_1px)] [background-size:16px_16px] opacity-10" />
-      
+
       {/* Surface de réparation Haut */}
       <div className="pointer-events-none absolute left-1/2 top-0 h-16 w-36 -translate-x-1/2 rounded-b-lg border-2 border-t-0 border-emerald-400/30 bg-emerald-500/5" />
       {/* Arc de cercle Haut */}
       <div className="pointer-events-none absolute left-1/2 top-16 h-10 w-20 -translate-x-1/2 rounded-b-full border-2 border-t-0 border-emerald-400/20" />
-      
+
       {/* Ligne médiane */}
       <div className="pointer-events-none absolute left-0 top-1/2 w-full border-t-2 border-emerald-400/30" />
       {/* Rond central */}
       <div className="pointer-events-none absolute left-1/2 top-1/2 h-24 w-24 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-emerald-400/30" />
-      
+
       {/* Surface de réparation Bas */}
       <div className="pointer-events-none absolute bottom-0 left-1/2 h-16 w-36 -translate-x-1/2 rounded-t-lg border-2 border-b-0 border-emerald-400/30 bg-emerald-500/5" />
       {/* Arc de cercle Bas */}
@@ -205,7 +206,7 @@ function PitchBoard({
         {/* Gardien */}
         <div className="flex justify-center">
           {keeper && (
-            <div className="flex flex-col items-center group">
+            <div className="group flex flex-col items-center">
               <div className="flex h-9 w-9 items-center justify-center rounded-full border-2 border-yellow-300 bg-amber-500 text-xs font-black text-black shadow-lg transition-transform group-hover:scale-110">
                 {keeper.jerseyNumber}
               </div>
@@ -218,9 +219,9 @@ function PitchBoard({
 
         {/* Lignes de champ (Défenseurs, Milieux, Attaquants) */}
         {rows.map((row, rIndex) => (
-          <div key={rIndex} className="flex justify-around items-center px-2">
+          <div key={rIndex} className="flex items-center justify-around px-2">
             {row.map((player) => (
-              <div key={player.playerId} className="flex flex-col items-center group">
+              <div key={player.playerId} className="group flex flex-col items-center">
                 <div
                   className={`flex h-9 w-9 items-center justify-center rounded-full border-2 text-xs font-black shadow-md transition-transform group-hover:scale-110 ${badgeBg}`}
                 >
@@ -250,13 +251,13 @@ type H2HMatch = {
 export default function MatchCentre({
   matchId,
   initialData,
-  h2h,
-  h2hSummary,
+  h2h = [],
+  h2hSummary = { homeWins: 0, awayWins: 0, draws: 0 },
 }: {
   matchId: number;
   initialData: LiveData;
-  h2h: H2HMatch[];
-  h2hSummary: { homeWins: number; awayWins: number; draws: number };
+  h2h?: H2HMatch[];
+  h2hSummary?: { homeWins: number; awayWins: number; draws: number };
 }) {
   const data = useRealtime<LiveData>(`/api/matches/${matchId}/live`, initialData, `match-${matchId}`);
   const searchParams = useSearchParams();
@@ -268,11 +269,17 @@ export default function MatchCentre({
   const [selectedPitchTeam, setSelectedPitchTeam] = useState<"home" | "away">("home");
 
   const isLive = data.status === "live" || data.status === "halftime";
-  const scorers = data.events.filter(
+  const events = data?.events ?? [];
+  const scorers = events.filter(
     (e) => e.eventType === "goal" || e.eventType === "penalty_goal" || e.eventType === "own_goal"
   );
   const homeScorers = scorers.filter((e) => e.team === data.homeTeam.name);
   const awayScorers = scorers.filter((e) => e.team === data.awayTeam.name);
+
+  const currentStarters =
+    selectedPitchTeam === "home" ? data.lineups?.home?.starters ?? [] : data.lineups?.away?.starters ?? [];
+  const currentSubstitutes =
+    selectedPitchTeam === "home" ? data.lineups?.home?.substitutes ?? [] : data.lineups?.away?.substitutes ?? [];
 
   return (
     <div className="overflow-hidden rounded-2xl bg-zinc-950 shadow-2xl">
@@ -294,15 +301,15 @@ export default function MatchCentre({
       </div>
 
       {/* Tabs */}
-      <div className="flex justify-center gap-1 border-b border-white/10 bg-zinc-900 px-4">
+      <div className="flex justify-center gap-1 border-b border-white/10 bg-zinc-900 px-4 overflow-x-auto">
         {TABS.map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
             className={
               tab === t
-                ? "border-b-2 border-brand-500 px-4 py-3 text-sm font-bold uppercase tracking-wide text-white"
-                : "px-4 py-3 text-sm font-semibold uppercase tracking-wide text-gray-500 hover:text-gray-300"
+                ? "border-b-2 border-brand-500 px-4 py-3 text-sm font-bold uppercase tracking-wide text-white whitespace-nowrap"
+                : "px-4 py-3 text-sm font-semibold uppercase tracking-wide text-gray-500 hover:text-gray-300 whitespace-nowrap"
             }
           >
             {t}
@@ -365,27 +372,32 @@ export default function MatchCentre({
               <StatBar
                 key={key}
                 label={label}
-                home={data.stats[key]?.[0] ?? 0}
-                away={data.stats[key]?.[1] ?? 0}
+                home={data.stats?.[key]?.[0] ?? 0}
+                away={data.stats?.[key]?.[1] ?? 0}
                 suffix={suffix}
               />
             ))}
             <StatBar
               label="Cartons"
-              home={(data.stats.yellowCards?.[0] ?? 0) + (data.stats.redCards?.[0] ?? 0) * 2}
-              away={(data.stats.yellowCards?.[1] ?? 0) + (data.stats.redCards?.[1] ?? 0) * 2}
+              home={(data.stats?.yellowCards?.[0] ?? 0) + (data.stats?.redCards?.[0] ?? 0) * 2}
+              away={(data.stats?.yellowCards?.[1] ?? 0) + (data.stats?.redCards?.[1] ?? 0) * 2}
             />
           </div>
         )}
 
         {tab === "Résumé" && (
           <ul className="space-y-3">
-            {data.events.length === 0 && data.commentary.length === 0 && (
+            {events.length === 0 && (data.commentary ?? []).length === 0 && (
               <p className="text-sm text-gray-500">Aucun événement pour le moment.</p>
             )}
             {[
-              ...data.events.map((e) => ({ kind: "event" as const, minute: e.minute, sortKey: e.minute * 10, data: e })),
-              ...data.commentary.map((c) => ({ kind: "comment" as const, minute: c.minute, sortKey: c.minute * 10 + 1, data: c })),
+              ...events.map((e) => ({ kind: "event" as const, minute: e.minute, sortKey: e.minute * 10, data: e })),
+              ...(data.commentary ?? []).map((c) => ({
+                kind: "comment" as const,
+                minute: c.minute,
+                sortKey: c.minute * 10 + 1,
+                data: c,
+              })),
             ]
               .sort((a, b) => a.sortKey - b.sortKey)
               .map((item) =>
@@ -443,7 +455,11 @@ export default function MatchCentre({
                     className="flex items-center justify-between rounded-lg bg-white/5 px-3 py-2 text-sm"
                   >
                     <span className="text-gray-400">
-                      {new Date(m.matchDate).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" })}
+                      {new Date(m.matchDate).toLocaleDateString("fr-FR", {
+                        day: "2-digit",
+                        month: "short",
+                        year: "numeric",
+                      })}
                     </span>
                     <span className="text-white">
                       {m.homeTeamName} <span className="font-bold">{m.homeScore} - {m.awayScore}</span> {m.awayTeamName}
@@ -458,12 +474,14 @@ export default function MatchCentre({
         {tab === "Compositions" && (
           <div className="space-y-6">
             {/* Contrôles d'affichage (Pitch vs Liste & Choix de l'Équipe) */}
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-zinc-900/80 p-3 border border-white/5">
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/5 bg-zinc-900/80 p-3">
               <div className="flex gap-2">
                 <button
                   onClick={() => setSelectedPitchTeam("home")}
                   className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-colors ${
-                    selectedPitchTeam === "home" ? "bg-brand-500 text-white" : "bg-white/5 text-gray-400 hover:text-white"
+                    selectedPitchTeam === "home"
+                      ? "bg-brand-500 text-white"
+                      : "bg-white/5 text-gray-400 hover:text-white"
                   }`}
                 >
                   {data.homeTeam.name}
@@ -471,7 +489,9 @@ export default function MatchCentre({
                 <button
                   onClick={() => setSelectedPitchTeam("away")}
                   className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-colors ${
-                    selectedPitchTeam === "away" ? "bg-brand-500 text-white" : "bg-white/5 text-gray-400 hover:text-white"
+                    selectedPitchTeam === "away"
+                      ? "bg-brand-500 text-white"
+                      : "bg-white/5 text-gray-400 hover:text-white"
                   }`}
                 >
                   {data.awayTeam.name}
@@ -508,45 +528,52 @@ export default function MatchCentre({
                     {selectedPitchTeam === "home" ? data.homeTeam.name : data.awayTeam.name}
                   </p>
                   <p className="text-xs text-gray-400">
-                    Formation : {selectedPitchTeam === "home" ? data.homeTeam.formation ?? "4-3-3" : data.awayTeam.formation ?? "4-3-3"}
+                    Formation :{" "}
+                    {selectedPitchTeam === "home"
+                      ? data.homeTeam.formation ?? "4-3-3"
+                      : data.awayTeam.formation ?? "4-3-3"}
                   </p>
                 </div>
 
                 <PitchBoard
                   formation={selectedPitchTeam === "home" ? data.homeTeam.formation : data.awayTeam.formation}
-                  starters={selectedPitchTeam === "home" ? data.lineups.home.starters : data.lineups.away.starters}
+                  starters={currentStarters}
                   isHomeTeam={selectedPitchTeam === "home"}
                 />
 
                 {/* Section Remplaçants sous le Terrain */}
-                <div className="rounded-xl bg-zinc-900/60 p-4 border border-white/5">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-3">Remplaçants</p>
+                <div className="rounded-xl border border-white/5 bg-zinc-900/60 p-4">
+                  <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-400">Remplaçants</p>
                   <div className="grid grid-cols-2 gap-2 text-sm text-gray-300">
-                    {(selectedPitchTeam === "home" ? data.lineups.home.substitutes : data.lineups.away.substitutes).map((p) => (
-                      <div key={p.playerId} className="flex items-center gap-2">
-                        <span className="flex h-5 w-5 items-center justify-center rounded bg-white/10 text-[10px] font-bold text-gray-300">
-                          #{p.jerseyNumber}
-                        </span>
-                        <span className="truncate">{p.playerName}</span>
-                      </div>
-                    ))}
+                    {currentSubstitutes.length === 0 ? (
+                      <p className="col-span-2 text-xs text-gray-500">Aucun remplaçant renseigné.</p>
+                    ) : (
+                      currentSubstitutes.map((p) => (
+                        <div key={p.playerId} className="flex items-center gap-2">
+                          <span className="flex h-5 w-5 items-center justify-center rounded bg-white/10 text-[10px] font-bold text-gray-300">
+                            #{p.jerseyNumber}
+                          </span>
+                          <span className="truncate">{p.playerName}</span>
+                        </div>
+                      ))
+                    )}
                   </div>
                 </div>
               </div>
             ) : (
-              /* Mode Affichage Liste Téléphone Classique */
+              /* Mode Affichage Liste Classique */
               <div className="grid gap-8 sm:grid-cols-2">
                 <div>
                   {data.homeTeam.formation && (
                     <p className="mb-2 text-xs text-gray-500">Formation : {data.homeTeam.formation}</p>
                   )}
-                  <LineupColumn teamName={data.homeTeam.name} data={data.lineups.home} />
+                  <LineupColumn teamName={data.homeTeam.name} data={data.lineups?.home} />
                 </div>
                 <div>
                   {data.awayTeam.formation && (
                     <p className="mb-2 text-xs text-gray-500">Formation : {data.awayTeam.formation}</p>
                   )}
-                  <LineupColumn teamName={data.awayTeam.name} data={data.lineups.away} />
+                  <LineupColumn teamName={data.awayTeam.name} data={data.lineups?.away} />
                 </div>
               </div>
             )}
