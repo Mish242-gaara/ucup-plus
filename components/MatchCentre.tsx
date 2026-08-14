@@ -183,8 +183,9 @@ function PlayerNode({ player }: { player: LineupEntry }) {
 /* ==========================================================================
    Terrain Tactique Visuel Complet (Les 2 Équipes en Vis-à-Vis)
    ========================================================================== */
+
 /* ==========================================================================
-   Terrain Tactique Visuel Complet (Les 2 Équipes dans leur camp respectif)
+   Terrain Tactique Visuel Complet (Espacement aéré style Flashscore)
    ========================================================================== */
 function DualFacingPitch({
   homeTeam,
@@ -233,7 +234,7 @@ function DualFacingPitch({
       {/* Surface Haut */}
       <div className="pointer-events-none absolute top-0 left-1/2 h-20 w-44 -translate-x-1/2 rounded-b-xl border border-t-0 border-slate-500/30 bg-slate-500/5" />
       <div className="pointer-events-none absolute top-0 left-1/2 h-8 w-20 -translate-x-1/2 rounded-b-md border border-t-0 border-slate-500/30" />
-      <div className="pointer-events-none absolute top-20 left-1/2 h-10 w-24 -translate-x-1/2 rounded-b-full border border-t-0 border-slate-500/20" />
+      <div className="pointer-events-none absolute top-20 left-1/2 h-10 w-24 -translate-x-1/2 rounded-b-full border border-slate-500/20" />
 
       {/* Ligne Médiane & Rond Central */}
       <div className="pointer-events-none absolute top-1/2 left-0 w-full border-t border-slate-500/40" />
@@ -242,40 +243,52 @@ function DualFacingPitch({
       {/* Surface Bas */}
       <div className="pointer-events-none absolute bottom-0 left-1/2 h-20 w-44 -translate-x-1/2 rounded-t-xl border border-b-0 border-slate-500/30 bg-slate-500/5" />
       <div className="pointer-events-none absolute bottom-0 left-1/2 h-8 w-20 -translate-x-1/2 rounded-t-md border border-b-0 border-slate-500/30" />
-      <div className="pointer-events-none absolute bottom-20 left-1/2 h-10 w-24 -translate-x-1/2 rounded-t-full border border-b-0 border-slate-500/20" />
+      <div className="pointer-events-none absolute bottom-20 left-1/2 h-10 w-24 -translate-x-1/2 rounded-t-full border border-slate-500/20" />
 
-      {/* Structure strict à 2 demi-terrains */}
-      <div className="relative z-10 flex min-h-[640px] flex-col justify-between sm:min-h-[720px]">
-        {/* MOITIÉ HAUT : Équipe Domicile (Attaque vers le bas) */}
-        <div className="flex h-1/2 flex-col justify-between pb-3">
+      {/* Terrain global aéré */}
+      <div className="relative z-10 flex min-h-[700px] flex-col justify-between py-2 sm:min-h-[780px]">
+        {/* Équipe Domicile (Haut) */}
+        <div className="flex flex-col justify-between space-y-4">
           {/* Gardien */}
-          <div className="flex justify-center pt-1">
+          <div className="flex justify-center">
             {homeKeeper && <PlayerNode player={homeKeeper} />}
           </div>
-          {/* Lignes de champ (Défenseurs -> Milieux -> Attaquants) */}
-          {homeRows.map((row, rIdx) => (
-            <div key={`home-row-${rIdx}`} className="flex items-center justify-around px-2">
-              {row.map((p) => (
-                <PlayerNode key={p.playerId} player={p} />
-              ))}
-            </div>
-          ))}
+          {/* Lignes de champ */}
+          {homeRows.map((row, rIdx) => {
+            const isLastRow = rIdx === homeRows.length - 1; // Attaquants
+            return (
+              <div
+                key={`home-row-${rIdx}`}
+                className={`flex items-center justify-around px-2 ${isLastRow ? "mb-8 sm:mb-10" : ""}`}
+              >
+                {row.map((p) => (
+                  <PlayerNode key={p.playerId} player={p} />
+                ))}
+              </div>
+            );
+          })}
         </div>
 
-        {/* MOITIÉ BAS : Équipe Extérieur (Attaque vers le haut) */}
-        <div className="flex h-1/2 flex-col-reverse justify-between pt-3">
+        {/* Équipe Extérieur (Bas) */}
+        <div className="flex flex-col-reverse justify-between space-y-4 space-y-reverse">
           {/* Gardien */}
-          <div className="flex justify-center pb-1">
+          <div className="flex justify-center">
             {awayKeeper && <PlayerNode player={awayKeeper} />}
           </div>
-          {/* Lignes de champ (Défenseurs -> Milieux -> Attaquants) */}
-          {awayRows.map((row, rIdx) => (
-            <div key={`away-row-${rIdx}`} className="flex items-center justify-around px-2">
-              {row.map((p) => (
-                <PlayerNode key={p.playerId} player={p} />
-              ))}
-            </div>
-          ))}
+          {/* Lignes de champ */}
+          {awayRows.map((row, rIdx) => {
+            const isLastRow = rIdx === awayRows.length - 1; // Attaquants
+            return (
+              <div
+                key={`away-row-${rIdx}`}
+                className={`flex items-center justify-around px-2 ${isLastRow ? "mt-8 sm:mt-10" : ""}`}
+              >
+                {row.map((p) => (
+                  <PlayerNode key={p.playerId} player={p} />
+                ))}
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>
