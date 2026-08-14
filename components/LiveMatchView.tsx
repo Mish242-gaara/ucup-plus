@@ -71,7 +71,7 @@ export default function LiveMatchView({ matchId }: { matchId: number }) {
   if (!data) {
     return (
       <div className="flex items-center justify-center py-12">
-        <p className="text-sm font-medium text-slate-400 animate-pulse">Chargement en direct…</p>
+        <p className="animate-pulse text-sm font-medium text-slate-400">Chargement en direct…</p>
       </div>
     );
   }
@@ -79,11 +79,11 @@ export default function LiveMatchView({ matchId }: { matchId: number }) {
   const isLive = data.status === "live" || data.status === "halftime";
   const events = data?.events ?? [];
 
-  // Tri des événements du plus ancien au plus récent (ou vice versa)
+  // Tri chronologique rigoureux des événements
   const sortedEvents = [...events].sort((a, b) => {
-    const minA = a.minute + (a.additionalTime ? parseInt(a.additionalTime, 10) / 100 : 0);
-    const minB = b.minute + (b.additionalTime ? parseInt(b.additionalTime, 10) / 100 : 0);
-    return minA - minB;
+    const timeA = a.minute + (a.additionalTime ? parseInt(a.additionalTime, 10) * 0.1 : 0);
+    const timeB = b.minute + (b.additionalTime ? parseInt(b.additionalTime, 10) * 0.1 : 0);
+    return timeA - timeB;
   });
 
   return (
@@ -125,7 +125,10 @@ export default function LiveMatchView({ matchId }: { matchId: number }) {
         ) : (
           <ul className="mt-3 space-y-2.5">
             {sortedEvents.map((e) => (
-              <li key={e.id} className="flex items-center gap-3 text-sm rounded-lg bg-slate-900/50 p-2 border border-slate-800/40">
+              <li
+                key={e.id}
+                className="flex items-center gap-3 rounded-lg border border-slate-800/40 bg-slate-900/50 p-2 text-sm"
+              >
                 <span className="w-10 shrink-0 font-mono text-xs font-bold text-slate-400">
                   {e.minute}
                   {e.additionalTime ? `+${e.additionalTime}` : ""}&apos;
