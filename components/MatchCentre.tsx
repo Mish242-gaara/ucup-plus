@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Trophy } from "lucide-react";
+import { Trophy, LayoutGrid, List } from "lucide-react";
 import { useRealtime } from "@/lib/hooks/useRealtime";
 import TeamLogo from "@/components/TeamLogo";
 
@@ -149,6 +149,95 @@ function LineupColumn({
   );
 }
 
+/* ==========================================================================
+   Pitch Board Component (Terrain Tactique Visuel)
+   ========================================================================== */
+function PitchBoard({
+  formation = "4-3-3",
+  starters,
+  isHomeTeam = true,
+}: {
+  formation: string | null;
+  starters: LineupEntry[];
+  isHomeTeam?: boolean;
+}) {
+  const parsedFormation = formation && formation.includes("-") ? formation.split("-").map(Number) : [4, 3, 3];
+  const sortedStarters = [...starters].sort((a, b) => (a.orderKey ?? 0) - (b.orderKey ?? 0));
+
+  // Découpage des joueurs par lignes tactiques
+  const keeper = sortedStarters[0];
+  const outfieldPlayers = sortedStarters.slice(1);
+
+  const rows: LineupEntry[][] = [];
+  let index = 0;
+  parsedFormation.forEach((count) => {
+    rows.push(outfieldPlayers.slice(index, index + count));
+    index += count;
+  });
+
+  // Couleur du maillot selon l'équipe
+  const badgeBg = isHomeTeam
+    ? "bg-gradient-to-tr from-brand-600 to-brand-400 border-white text-white shadow-brand-500/50"
+    : "bg-gradient-to-tr from-zinc-100 to-zinc-300 border-zinc-900 text-zinc-950 shadow-zinc-400/50";
+
+  return (
+    <div className="relative mx-auto aspect-[2/3] w-full max-w-md overflow-hidden rounded-2xl border-2 border-emerald-500/30 bg-emerald-950/80 p-4 shadow-2xl backdrop-blur">
+      {/* Texture du Terrain / Lignes de jeu */}
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(#10b981_1px,transparent_1px)] [background-size:16px_16px] opacity-10" />
+      
+      {/* Surface de réparation Haut */}
+      <div className="pointer-events-none absolute left-1/2 top-0 h-16 w-36 -translate-x-1/2 rounded-b-lg border-2 border-t-0 border-emerald-400/30 bg-emerald-500/5" />
+      {/* Arc de cercle Haut */}
+      <div className="pointer-events-none absolute left-1/2 top-16 h-10 w-20 -translate-x-1/2 rounded-b-full border-2 border-t-0 border-emerald-400/20" />
+      
+      {/* Ligne médiane */}
+      <div className="pointer-events-none absolute left-0 top-1/2 w-full border-t-2 border-emerald-400/30" />
+      {/* Rond central */}
+      <div className="pointer-events-none absolute left-1/2 top-1/2 h-24 w-24 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-emerald-400/30" />
+      
+      {/* Surface de réparation Bas */}
+      <div className="pointer-events-none absolute bottom-0 left-1/2 h-16 w-36 -translate-x-1/2 rounded-t-lg border-2 border-b-0 border-emerald-400/30 bg-emerald-500/5" />
+      {/* Arc de cercle Bas */}
+      <div className="pointer-events-none absolute bottom-16 left-1/2 h-10 w-20 -translate-x-1/2 rounded-t-full border-2 border-b-0 border-emerald-400/20" />
+
+      {/* Dispositions des Joueurs sur le Pitch */}
+      <div className="relative z-10 flex h-full flex-col justify-between py-2">
+        {/* Gardien */}
+        <div className="flex justify-center">
+          {keeper && (
+            <div className="flex flex-col items-center group">
+              <div className="flex h-9 w-9 items-center justify-center rounded-full border-2 border-yellow-300 bg-amber-500 text-xs font-black text-black shadow-lg transition-transform group-hover:scale-110">
+                {keeper.jerseyNumber}
+              </div>
+              <span className="mt-1 max-w-[80px] truncate rounded bg-black/75 px-1.5 py-0.5 text-center text-[10px] font-semibold text-white backdrop-blur">
+                {keeper.playerName}
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* Lignes de champ (Défenseurs, Milieux, Attaquants) */}
+        {rows.map((row, rIndex) => (
+          <div key={rIndex} className="flex justify-around items-center px-2">
+            {row.map((player) => (
+              <div key={player.playerId} className="flex flex-col items-center group">
+                <div
+                  className={`flex h-9 w-9 items-center justify-center rounded-full border-2 text-xs font-black shadow-md transition-transform group-hover:scale-110 ${badgeBg}`}
+                >
+                  {player.jerseyNumber}
+                </div>
+                <span className="mt-1 max-w-[80px] truncate rounded bg-black/75 px-1.5 py-0.5 text-center text-[10px] font-semibold text-white backdrop-blur">
+                  {player.playerName}
+                </span>
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 type H2HMatch = {
   id: number;
   matchDate: string;
@@ -173,6 +262,10 @@ export default function MatchCentre({
   const searchParams = useSearchParams();
   const initialTab = TAB_PARAM[searchParams.get("tab") ?? ""] ?? "Scores";
   const [tab, setTab] = useState<(typeof TABS)[number]>(initialTab);
+
+  // État local pour gérer la vue du terrain tactile
+  const [lineupViewMode, setLineupViewMode] = useState<"pitch" | "list">("pitch");
+  const [selectedPitchTeam, setSelectedPitchTeam] = useState<"home" | "away">("home");
 
   const isLive = data.status === "live" || data.status === "halftime";
   const scorers = data.events.filter(
@@ -363,19 +456,100 @@ export default function MatchCentre({
         )}
 
         {tab === "Compositions" && (
-          <div className="grid gap-8 sm:grid-cols-2">
-            <div>
-              {data.homeTeam.formation && (
-                <p className="mb-2 text-xs text-gray-500">Formation : {data.homeTeam.formation}</p>
-              )}
-              <LineupColumn teamName={data.homeTeam.name} data={data.lineups.home} />
+          <div className="space-y-6">
+            {/* Contrôles d'affichage (Pitch vs Liste & Choix de l'Équipe) */}
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-zinc-900/80 p-3 border border-white/5">
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setSelectedPitchTeam("home")}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-colors ${
+                    selectedPitchTeam === "home" ? "bg-brand-500 text-white" : "bg-white/5 text-gray-400 hover:text-white"
+                  }`}
+                >
+                  {data.homeTeam.name}
+                </button>
+                <button
+                  onClick={() => setSelectedPitchTeam("away")}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-colors ${
+                    selectedPitchTeam === "away" ? "bg-brand-500 text-white" : "bg-white/5 text-gray-400 hover:text-white"
+                  }`}
+                >
+                  {data.awayTeam.name}
+                </button>
+              </div>
+
+              <div className="flex items-center gap-1 rounded-lg bg-black/40 p-1">
+                <button
+                  onClick={() => setLineupViewMode("pitch")}
+                  className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold ${
+                    lineupViewMode === "pitch" ? "bg-brand-500 text-white" : "text-gray-400 hover:text-white"
+                  }`}
+                >
+                  <LayoutGrid size={14} />
+                  Terrain
+                </button>
+                <button
+                  onClick={() => setLineupViewMode("list")}
+                  className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold ${
+                    lineupViewMode === "list" ? "bg-brand-500 text-white" : "text-gray-400 hover:text-white"
+                  }`}
+                >
+                  <List size={14} />
+                  Liste
+                </button>
+              </div>
             </div>
-            <div>
-              {data.awayTeam.formation && (
-                <p className="mb-2 text-xs text-gray-500">Formation : {data.awayTeam.formation}</p>
-              )}
-              <LineupColumn teamName={data.awayTeam.name} data={data.lineups.away} />
-            </div>
+
+            {/* Mode Affichage Terrain Visuel */}
+            {lineupViewMode === "pitch" ? (
+              <div className="space-y-4">
+                <div className="text-center">
+                  <p className="text-sm font-bold text-white">
+                    {selectedPitchTeam === "home" ? data.homeTeam.name : data.awayTeam.name}
+                  </p>
+                  <p className="text-xs text-gray-400">
+                    Formation : {selectedPitchTeam === "home" ? data.homeTeam.formation ?? "4-3-3" : data.awayTeam.formation ?? "4-3-3"}
+                  </p>
+                </div>
+
+                <PitchBoard
+                  formation={selectedPitchTeam === "home" ? data.homeTeam.formation : data.awayTeam.formation}
+                  starters={selectedPitchTeam === "home" ? data.lineups.home.starters : data.lineups.away.starters}
+                  isHomeTeam={selectedPitchTeam === "home"}
+                />
+
+                {/* Section Remplaçants sous le Terrain */}
+                <div className="rounded-xl bg-zinc-900/60 p-4 border border-white/5">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-3">Remplaçants</p>
+                  <div className="grid grid-cols-2 gap-2 text-sm text-gray-300">
+                    {(selectedPitchTeam === "home" ? data.lineups.home.substitutes : data.lineups.away.substitutes).map((p) => (
+                      <div key={p.playerId} className="flex items-center gap-2">
+                        <span className="flex h-5 w-5 items-center justify-center rounded bg-white/10 text-[10px] font-bold text-gray-300">
+                          #{p.jerseyNumber}
+                        </span>
+                        <span className="truncate">{p.playerName}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              /* Mode Affichage Liste Téléphone Classique */
+              <div className="grid gap-8 sm:grid-cols-2">
+                <div>
+                  {data.homeTeam.formation && (
+                    <p className="mb-2 text-xs text-gray-500">Formation : {data.homeTeam.formation}</p>
+                  )}
+                  <LineupColumn teamName={data.homeTeam.name} data={data.lineups.home} />
+                </div>
+                <div>
+                  {data.awayTeam.formation && (
+                    <p className="mb-2 text-xs text-gray-500">Formation : {data.awayTeam.formation}</p>
+                  )}
+                  <LineupColumn teamName={data.awayTeam.name} data={data.lineups.away} />
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
