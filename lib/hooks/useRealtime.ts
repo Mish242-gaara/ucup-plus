@@ -1,23 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import Pusher from "pusher-js";
-
-let sharedPusher: Pusher | null | undefined;
-
-function getPusherClient(): Pusher | null {
-  if (sharedPusher !== undefined) return sharedPusher;
-
-  const key = process.env.NEXT_PUBLIC_PUSHER_KEY;
-  const cluster = process.env.NEXT_PUBLIC_PUSHER_CLUSTER;
-  if (!key || !cluster) {
-    sharedPusher = null;
-    return sharedPusher;
-  }
-
-  sharedPusher = new Pusher(key, { cluster });
-  return sharedPusher;
-}
 
 /**
  * Fetches `url`, then stays in sync via a Pusher channel event named
@@ -61,17 +44,40 @@ export function useRealtime<T>(
   // Subscribe to push updates + keep a slow fallback poll running,
   // independent of URL changes (no need to resubscribe on every filter switch).
   useEffect(() => {
-    const pusher = getPusherClient();
-    const channel = pusher?.subscribe(channelName);
-    channel?.bind("update", fetchNow);
+    let localPusher: any = null;
+    let channel: any = null;
+
+    const setup = async () => {
+      const key = process.env.NEXT_PUBLIC_PUSHER_KEY;
+      const cluster = process.env.NEXT_PUBLIC_PUSHER_CLUSTER;
+      if (!key || !cluster) return;
+
+      try {
+        const PusherMod = await import("pusher-js");
+        const Pusher = PusherMod && (PusherMod.default ?? PusherMod);
+        localPusher = new Pusher(key, { cluster });
+        channel = localPusher.subscribe(channelName);
+        channel.bind("update", fetchNow);
+      } catch {
+        // If dynamic import or setup fails, ignore and rely on polling fallback.
+      }
+    };
+
+    setup();
 
     const interval = setInterval(fetchNow, fallbackIntervalMs);
 
     return () => {
       clearInterval(interval);
-      if (pusher && channel) {
-        channel.unbind("update", fetchNow);
-        pusher.unsubscribe(channelName);
+      try {
+        if (channel) {
+          channel.unbind("update", fetchNow);
+        }
+        if (localPusher) {
+          localPusher.unsubscribe(channelName);
+        }
+      } catch {
+        // swallow errors during cleanup
       }
     };
   }, [channelName, fallbackIntervalMs, fetchNow]);
