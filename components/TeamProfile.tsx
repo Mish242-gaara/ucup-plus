@@ -128,7 +128,7 @@ export default function TeamProfile({
           <div className="mt-4 flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-5">
               <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white p-2 sm:h-28 sm:w-28">
-                <TeamLogo name={team.name} logo={team.university.logo} size={96} />
+                <TeamLogo name={team.name} logo={team.university?.logo ?? null} size={96} />
               </div>
               <div>
                 <h1 className="text-3xl font-extrabold sm:text-4xl">{team.name}</h1>
@@ -258,13 +258,13 @@ export default function TeamProfile({
                     <div className="mt-2 flex items-center justify-between">
                       <TeamLogo
                         name={upcomingMatch.homeTeam.name}
-                        logo={upcomingMatch.homeTeam.university.logo}
+                        logo={upcomingMatch.homeTeam.university?.logo ?? null}
                         size={36}
                       />
                       <span className="text-sm font-bold text-gray-400">VS</span>
                       <TeamLogo
                         name={upcomingMatch.awayTeam.name}
-                        logo={upcomingMatch.awayTeam.university.logo}
+                        logo={upcomingMatch.awayTeam.university?.logo ?? null}
                         size={36}
                       />
                     </div>

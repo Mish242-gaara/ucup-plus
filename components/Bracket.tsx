@@ -39,7 +39,7 @@ function BracketCard({ m, isLast }: { m: BracketMatch; isLast: boolean }) {
       >
         <div className={`flex items-center justify-between px-3 py-1.5 ${homeWon ? "bg-brand-50" : ""}`}>
           <span className="flex items-center gap-1.5 truncate">
-            <TeamLogo name={m.homeTeam?.name ?? "?"} logo={m.homeTeam?.university.logo ?? null} size={18} />
+            <TeamLogo name={m.homeTeam?.name ?? "?"} logo={m.homeTeam?.university?.logo ?? null} size={18} />
             <span className={`truncate ${homeWon ? "font-bold text-ink" : "text-gray-600"}`}>
               {m.homeTeam?.name ?? "À déterminer"}
             </span>
@@ -48,7 +48,7 @@ function BracketCard({ m, isLast }: { m: BracketMatch; isLast: boolean }) {
         </div>
         <div className={`flex items-center justify-between border-t border-gray-100 px-3 py-1.5 ${awayWon ? "bg-brand-50" : ""}`}>
           <span className="flex items-center gap-1.5 truncate">
-            <TeamLogo name={m.awayTeam?.name ?? "?"} logo={m.awayTeam?.university.logo ?? null} size={18} />
+            <TeamLogo name={m.awayTeam?.name ?? "?"} logo={m.awayTeam?.university?.logo ?? null} size={18} />
             <span className={`truncate ${awayWon ? "font-bold text-ink" : "text-gray-600"}`}>
               {m.awayTeam?.name ?? "À déterminer"}
             </span>

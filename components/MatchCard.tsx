@@ -52,7 +52,7 @@ export default function MatchCard({ m }: { m: MatchCardData }) {
 
       <Link href={`/matches/${m.id}`} className="grid grid-cols-3 items-center gap-2 px-4 py-4">
         <div className="flex items-center gap-2">
-          <TeamLogo name={m.homeTeam.name} logo={m.homeTeam.university.logo} />
+          <TeamLogo name={m.homeTeam.name} logo={m.homeTeam.university?.logo ?? null} />
           <span className="text-sm font-semibold text-ink">{m.homeTeam.name}</span>
         </div>
 
@@ -71,7 +71,7 @@ export default function MatchCard({ m }: { m: MatchCardData }) {
 
         <div className="flex items-center justify-end gap-2 text-right">
           <span className="text-sm font-semibold text-ink">{m.awayTeam.name}</span>
-          <TeamLogo name={m.awayTeam.name} logo={m.awayTeam.university.logo} />
+          <TeamLogo name={m.awayTeam.name} logo={m.awayTeam.university?.logo ?? null} />
         </div>
       </Link>
 

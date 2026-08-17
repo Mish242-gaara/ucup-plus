@@ -47,7 +47,7 @@ function TeamCard({
 
       <Link href={`/teams/${team.id}`} className={compact ? "flex flex-1 items-center gap-4" : "block"}>
         <div className={compact ? "" : "mx-auto"} style={{ width: compact ? undefined : "fit-content" }}>
-          <TeamLogo name={team.name} logo={team.university.logo} size={compact ? 48 : 72} />
+          <TeamLogo name={team.name} logo={team.university?.logo ?? null} size={compact ? 48 : 72} />
         </div>
         <div className={compact ? "flex-1" : "mt-3"}>
           <p className="font-bold text-ink hover:text-brand-600 transition-colors">{team.name}</p>

@@ -23,7 +23,7 @@ export default async function TeamsCarousel() {
             className="flex flex-col items-center gap-1.5 shrink-0 group"
           >
             <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gray-50 border border-gray-100 p-1 group-hover:scale-105 group-hover:border-red-500 transition">
-              <TeamLogo name={team.name} logo={team.university.logo} size={32} />
+              <TeamLogo name={team.name} logo={team.university?.logo ?? null} size={32} />
             </div>
             <span className="text-[11px] font-bold text-ink group-hover:text-red-600 transition">
               {team.name}
