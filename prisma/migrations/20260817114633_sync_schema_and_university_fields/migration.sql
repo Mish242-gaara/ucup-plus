@@ -1,0 +1,7 @@
+-- AlterTable
+ALTER TABLE "universities" 
+ADD COLUMN IF NOT EXISTS "address" TEXT,
+ADD COLUMN IF NOT EXISTS "website" TEXT,
+ADD COLUMN IF NOT EXISTS "contact_email" TEXT,
+ADD COLUMN IF NOT EXISTS "contact_phone" TEXT,
+ADD COLUMN IF NOT EXISTS "is_verified" BOOLEAN NOT NULL DEFAULT true;?

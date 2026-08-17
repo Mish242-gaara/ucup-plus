@@ -16,18 +16,20 @@ import QuickStatButtons from "@/components/QuickStatButtons";
 import ConfirmButton from "@/components/ConfirmButton";
 import WhatsAppShareLink from "@/components/WhatsAppShareLink";
 
+export const dynamic = "force-dynamic";
+
 const EVENT_TYPES = [
-  { value: "goal", label: "But" },
-  { value: "penalty_goal", label: "But sur penalty" },
-  { value: "own_goal", label: "But contre son camp" },
-  { value: "yellow_card", label: "Carton jaune" },
-  { value: "second_yellow", label: "Deuxième jaune (exclusion)" },
-  { value: "red_card", label: "Carton rouge" },
-  { value: "substitution_in", label: "Entrée en jeu" },
-  { value: "substitution_out", label: "Sortie du joueur" },
-  { value: "injury", label: "Blessure" },
-  { value: "penalty_missed", label: "Penalty manqué" },
-  { value: "big_chance_missed", label: "Grosse occasion manquée" },
+  { value: "goal", label: "⚽ But" },
+  { value: "penalty_goal", label: "🎯 But sur penalty" },
+  { value: "own_goal", label: "💥 But contre son camp" },
+  { value: "yellow_card", label: "🟨 Carton jaune" },
+  { value: "second_yellow", label: "🟥 Deuxième jaune (Exclusion)" },
+  { value: "red_card", label: "🟥 Carton rouge direct" },
+  { value: "substitution_in", label: "🔄 Entrée en jeu" },
+  { value: "substitution_out", label: "⬅️ Sortie du joueur" },
+  { value: "injury", label: "🚑 Blessure" },
+  { value: "penalty_missed", label: "❌ Penalty manqué" },
+  { value: "big_chance_missed", label: "⚠️ Grosse occasion manquée" },
 ];
 
 const STATUS_LABELS: Record<string, string> = {
@@ -42,11 +44,13 @@ export default async function AdminLiveMatchPage({ params }: { params: Promise<{
   const { id } = await params;
   const matchId = Number(id);
 
+  if (isNaN(matchId)) notFound();
+
   const match = await prisma.match.findUnique({
     where: { id: matchId },
     include: {
-      homeTeam: { include: { players: { where: { status: "approved" } } } },
-      awayTeam: { include: { players: { where: { status: "approved" } } } },
+      homeTeam: { include: { players: { where: { status: "approved" }, orderBy: { jerseyNumber: "asc" } } } },
+      awayTeam: { include: { players: { where: { status: "approved" }, orderBy: { jerseyNumber: "asc" } } } },
       events: { orderBy: [{ minute: "asc" }, { id: "asc" }], include: { player: true, team: true } },
       commentary: { orderBy: [{ minute: "asc" }, { id: "asc" }] },
     },
@@ -57,107 +61,138 @@ export default async function AdminLiveMatchPage({ params }: { params: Promise<{
   const elapsed = getElapsedSeconds(match);
   const allPlayers = [...match.homeTeam.players, ...match.awayTeam.players];
 
+  // Extraction des Server Actions
+  async function handleAddFirstHalfTime(formData: FormData) {
+    "use server";
+    await addAdditionalTime(matchId, "first", Number(formData.get("minutes")));
+  }
+
+  async function handleAddSecondHalfTime(formData: FormData) {
+    "use server";
+    await addAdditionalTime(matchId, "second", Number(formData.get("minutes")));
+  }
+
+  async function handleAddCommentary(formData: FormData) {
+    "use server";
+    const minute = Number(formData.get("minute"));
+    const text = String(formData.get("text") ?? "");
+    await addCommentary(matchId, minute, text);
+  }
+
   return (
-    <div>
-      <h1 className="text-2xl font-extrabold text-white">
-        {match.homeTeam.name} {match.homeScore} - {match.awayScore} {match.awayTeam.name}
-      </h1>
-      <p className="mt-1 text-sm text-gray-400">
-        Statut : <span className="text-gray-300">{STATUS_LABELS[match.status] ?? match.status}</span> · Temps :{" "}
-        <span className="tabular-nums text-gray-300">{formatElapsed(elapsed)}</span>
-        {match.timerPausedAt ? " (en pause)" : ""}
-      </p>
-      <div className="mt-2">
-        <WhatsAppShareLink
-          text={`⚽ ${match.homeTeam.name} ${match.homeScore} - ${match.awayScore} ${match.awayTeam.name} — suis le direct sur ${process.env.NEXT_PUBLIC_SITE_URL ?? ""}/matches/${matchId}`}
-        />
+    <div className="space-y-6">
+      {/* --- Dashboard Header (Flashscore / Sofascore Style) --- */}
+      <div className="rounded-xl border border-white/10 bg-zinc-900/90 p-5 shadow-2xl backdrop-blur-md">
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-4">
+          <div className="flex items-center gap-3">
+            <span className="flex h-3 w-3 relative">
+              {match.status === "live" && (
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              )}
+              <span
+                className={`relative inline-flex rounded-full h-3 w-3 ${
+                  match.status === "live"
+                    ? "bg-emerald-500"
+                    : match.status === "halftime"
+                    ? "bg-amber-500"
+                    : "bg-zinc-600"
+                }`}
+              />
+            </span>
+            <span className="text-xs font-bold uppercase tracking-wider text-gray-400">
+              {STATUS_LABELS[match.status] ?? match.status}
+            </span>
+            <span className="rounded bg-zinc-800 px-2 py-0.5 font-mono text-xs text-brand-400">
+              {formatElapsed(elapsed)} {match.timerPausedAt ? "(En pause)" : ""}
+            </span>
+          </div>
+
+          <WhatsAppShareLink
+            text={`⚽ ${match.homeTeam.name} ${match.homeScore} - ${match.awayScore} ${match.awayTeam.name} — Suis le direct sur ${
+              process.env.NEXT_PUBLIC_SITE_URL ?? ""
+            }/matches/${matchId}`}
+          />
+        </div>
+
+        {/* Score Board */}
+        <div className="mt-4 flex items-center justify-between text-center">
+          <div className="flex-1 text-right">
+            <h2 className="text-lg font-bold text-white sm:text-2xl">{match.homeTeam.name}</h2>
+          </div>
+          <div className="mx-6 rounded-lg bg-zinc-950 px-5 py-2 font-mono text-3xl font-black text-white shadow-inner sm:text-4xl">
+            {match.homeScore} - {match.awayScore}
+          </div>
+          <div className="flex-1 text-left">
+            <h2 className="text-lg font-bold text-white sm:text-2xl">{match.awayTeam.name}</h2>
+          </div>
+        </div>
       </div>
 
-      {/* --- Timer controls --- */}
-      <section className="mt-6 admin-card p-4">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-400">Minuteur</h2>
+      {/* --- Timer Controls --- */}
+      <section className="rounded-xl border border-white/10 bg-zinc-900 p-5 shadow-lg">
+        <h2 className="text-xs font-bold uppercase tracking-widest text-zinc-400">Contrôle du Minuteur</h2>
         <div className="mt-3 flex flex-wrap gap-2">
           <form action={startTimer.bind(null, matchId)}>
-            <button className="btn" type="submit">
-              Démarrer
+            <button className="rounded-md bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-500" type="submit">
+              ▶ Démarrer
             </button>
           </form>
           <form action={pauseTimer.bind(null, matchId)}>
-            <button className="btn" type="submit">
-              Pause
+            <button className="rounded-md bg-amber-600 px-4 py-2 text-xs font-bold text-white hover:bg-amber-500" type="submit">
+              ⏸ Pause
             </button>
           </form>
           <form action={setHalftime.bind(null, matchId)}>
-            <button className="btn" type="submit">
-              Mi-temps
+            <button className="rounded-md bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-500" type="submit">
+              ☕ Mi-Temps
             </button>
           </form>
           <form action={resumeTimer.bind(null, matchId)}>
-            <button className="btn" type="submit">
-              Reprendre
+            <button className="rounded-md bg-indigo-600 px-4 py-2 text-xs font-bold text-white hover:bg-indigo-500" type="submit">
+              🔄 Reprendre
             </button>
           </form>
           <form action={stopTimer.bind(null, matchId)}>
-            <button className="btn" type="submit">
-              Terminer le match
+            <button className="rounded-md bg-rose-600 px-4 py-2 text-xs font-bold text-white hover:bg-rose-500" type="submit">
+              ⏹ Fin de Match
             </button>
           </form>
         </div>
 
-        <div className="mt-4 flex flex-wrap items-end gap-4 text-sm">
-          <form
-            action={async (fd: FormData) => {
-              "use server";
-              await addAdditionalTime(matchId, "first", Number(fd.get("minutes")));
-            }}
-            className="flex items-end gap-2"
-          >
-            <div>
-              <label className="block text-xs text-gray-400">Temps additionnel 1ère mi-temps</label>
-              <input name="minutes" type="number" defaultValue={1} className="input w-20" />
-            </div>
-            <button className="text-brand-500 hover:underline" type="submit">
-              Ajouter
+        <div className="mt-5 grid grid-cols-1 gap-4 border-t border-white/5 pt-4 sm:grid-cols-2 lg:grid-cols-4 text-xs">
+          <form action={handleAddFirstHalfTime} className="flex items-center gap-2">
+            <input name="minutes" type="number" defaultValue={1} className="input w-16 text-center" />
+            <button className="font-semibold text-brand-400 hover:underline" type="submit">
+              + Add. MT1
             </button>
           </form>
 
-          <form
-            action={async (fd: FormData) => {
-              "use server";
-              await addAdditionalTime(matchId, "second", Number(fd.get("minutes")));
-            }}
-            className="flex items-end gap-2"
-          >
-            <div>
-              <label className="block text-xs text-gray-400">Temps additionnel 2e mi-temps</label>
-              <input name="minutes" type="number" defaultValue={1} className="input w-20" />
-            </div>
-            <button className="text-brand-500 hover:underline" type="submit">
-              Ajouter
+          <form action={handleAddSecondHalfTime} className="flex items-center gap-2">
+            <input name="minutes" type="number" defaultValue={1} className="input w-16 text-center" />
+            <button className="font-semibold text-brand-400 hover:underline" type="submit">
+              + Add. MT2
             </button>
           </form>
 
-          <form action={setExtraTime.bind(null, matchId, !match.isExtraTime)}>
-            <button className="text-brand-500 hover:underline" type="submit">
-              {match.isExtraTime ? "Désactiver" : "Activer"} la prolongation
+          <form action={setExtraTime.bind(null, matchId, !match.isExtraTime)} className="flex items-center">
+            <button className="font-semibold text-indigo-400 hover:underline" type="submit">
+              {match.isExtraTime ? "❌ Annuler Prolongations" : "⏱️ Activer Prolongations"}
             </button>
           </form>
 
-          <form action={setPenaltyShootout.bind(null, matchId, !match.isPenaltyShootout)}>
-            <button className="text-brand-500 hover:underline" type="submit">
-              {match.isPenaltyShootout ? "Désactiver" : "Activer"} les tirs au but
+          <form action={setPenaltyShootout.bind(null, matchId, !match.isPenaltyShootout)} className="flex items-center">
+            <button className="font-semibold text-amber-400 hover:underline" type="submit">
+              {match.isPenaltyShootout ? "❌ Annuler TAB" : "🎯 Activer Tirs au But"}
             </button>
           </form>
         </div>
       </section>
 
-      {/* --- Quick-action stats (feeds the public Match Centre "Stats" tab) --- */}
-      <section className="mt-6 admin-card p-4">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-brand-500">
-          Statistiques en direct
-        </h2>
+      {/* --- Quick-action Stats --- */}
+      <section className="rounded-xl border border-white/10 bg-zinc-900 p-5 shadow-lg">
+        <h2 className="text-xs font-bold uppercase tracking-widest text-brand-400">Saisie Rapide des Stats Live</h2>
         <p className="mt-1 text-xs text-gray-400">
-          Chaque clic se répercute immédiatement sur l&apos;onglet Stats du Match Centre public.
+          Chaque incrémentation met à jour instantanément la vue publique SofaScore.
         </p>
         <div className="mt-4">
           <QuickStatButtons
@@ -166,24 +201,24 @@ export default async function AdminLiveMatchPage({ params }: { params: Promise<{
             awayTeamName={match.awayTeam.name}
             initialPossession={match.homePossession ?? 50}
             initialStats={{
-              shots: [match.homeShots, match.awayShots],
+              shots: [match.homeShots ?? 0, match.awayShots ?? 0],
               shotsOnTarget: [match.homeShotsOnTarget ?? 0, match.awayShotsOnTarget ?? 0],
-              corners: [match.homeCorners, match.awayCorners],
-              fouls: [match.homeFouls, match.awayFouls],
-              offsides: [match.homeOffsides, match.awayOffsides],
-              saves: [match.homeSaves, match.awaySaves],
-              freeKicks: [match.homeFreeKicks, match.awayFreeKicks],
-              throwIns: [match.homeThrowIns, match.awayThrowIns],
-              goalkicks: [match.homeGoalkicks, match.awayGoalkicks],
-              penalties: [match.homePenalties, match.awayPenalties],
+              corners: [match.homeCorners ?? 0, match.awayCorners ?? 0],
+              fouls: [match.homeFouls ?? 0, match.awayFouls ?? 0],
+              offsides: [match.homeOffsides ?? 0, match.awayOffsides ?? 0],
+              saves: [match.homeSaves ?? 0, match.awaySaves ?? 0],
+              freeKicks: [match.homeFreeKicks ?? 0, match.awayFreeKicks ?? 0],
+              throwIns: [match.homeThrowIns ?? 0, match.awayThrowIns ?? 0],
+              goalkicks: [match.homeGoalkicks ?? 0, match.awayGoalkicks ?? 0],
+              penalties: [match.homePenalties ?? 0, match.awayPenalties ?? 0],
             }}
           />
         </div>
       </section>
 
-      {/* --- Add event --- */}
-      <section className="mt-6 admin-card p-4">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-400">Ajouter un événement</h2>
+      {/* --- Add Event Form --- */}
+      <section className="rounded-xl border border-white/10 bg-zinc-900 p-5 shadow-lg">
+        <h2 className="text-xs font-bold uppercase tracking-widest text-zinc-400">Enregistrer un Événement</h2>
         <form action={addEvent} className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
           <input type="hidden" name="matchId" value={matchId} />
 
@@ -201,71 +236,59 @@ export default async function AdminLiveMatchPage({ params }: { params: Promise<{
           </select>
 
           <select name="playerId" required className="input">
-            <option value="">Joueur…</option>
+            <option value="">Joueur principal…</option>
             {allPlayers.map((p) => (
               <option key={p.id} value={p.id}>
-                #{p.jerseyNumber} {p.firstName} {p.lastName}
+                #{p.jerseyNumber ?? "-"} {p.firstName} {p.lastName}
               </option>
             ))}
           </select>
 
-          <input name="minute" type="number" placeholder="Minute" required className="input" />
+          <input name="minute" type="number" placeholder="Minute (ex: 45)" required className="input" />
 
           <select name="assistPlayerId" className="input">
-            <option value="">Passeur (optionnel)</option>
+            <option value="">Passeur (Optionnel)</option>
             {allPlayers.map((p) => (
               <option key={p.id} value={p.id}>
-                #{p.jerseyNumber} {p.firstName} {p.lastName}
+                #{p.jerseyNumber ?? "-"} {p.firstName} {p.lastName}
               </option>
             ))}
           </select>
 
           <select name="outPlayerId" className="input">
-            <option value="">Joueur sorti (optionnel)</option>
+            <option value="">Joueur sortant (Optionnel)</option>
             {allPlayers.map((p) => (
               <option key={p.id} value={p.id}>
-                #{p.jerseyNumber} {p.firstName} {p.lastName}
+                #{p.jerseyNumber ?? "-"} {p.firstName} {p.lastName}
               </option>
             ))}
           </select>
 
-          <input name="additionalTime" placeholder="Temps add. (+2…)" className="input" />
-          <input name="description" placeholder="Note" className="input" />
+          <input name="additionalTime" placeholder="Temps Add. (ex: +3)" className="input" />
+          <input name="description" placeholder="Note ou détails" className="input" />
 
-          <button type="submit" className="btn col-span-2 sm:col-span-4">
-            Ajouter l&apos;événement
+          <button type="submit" className="btn col-span-2 sm:col-span-4 bg-brand-600 hover:bg-brand-500">
+            Valider l&apos;Événement
           </button>
         </form>
       </section>
 
-      {/* --- Add commentary --- */}
-      <section className="mt-6 admin-card p-4">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-brand-400">
-          Ajouter un commentaire
-        </h2>
-        <p className="mt-1 text-xs text-gray-500">
-          Texte libre (occasion manquée, ambiance, tactique…), affiché dans le fil du match aux côtés
-          des événements suivis (buts, cartons…).
-        </p>
-        <form
-          action={async (fd: FormData) => {
-            "use server";
-            await addCommentary(matchId, Number(fd.get("minute")), String(fd.get("text") ?? ""));
-          }}
-          className="mt-3 grid grid-cols-6 gap-2"
-        >
+      {/* --- Commentary Form --- */}
+      <section className="rounded-xl border border-white/10 bg-zinc-900 p-5 shadow-lg">
+        <h2 className="text-xs font-bold uppercase tracking-widest text-brand-400">Commentaire Live / Fil d&apos;Actu</h2>
+        <form action={handleAddCommentary} className="mt-3 grid grid-cols-6 gap-2">
           <input name="minute" type="number" min={0} placeholder="Min." required className="input col-span-1" />
-          <input name="text" placeholder="Commentaire…" required className="input col-span-4" />
-          <button type="submit" className="btn col-span-1">
-            Ajouter
+          <input name="text" placeholder="Description de l'action, arrêt décisif, ambiance..." required className="input col-span-4" />
+          <button type="submit" className="btn col-span-1 bg-zinc-800 hover:bg-zinc-700">
+            Publier
           </button>
         </form>
       </section>
 
-      {/* --- Event & commentary feed --- */}
-      <section className="mt-6">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-400">Fil du match</h2>
-        <ul className="mt-3 space-y-2">
+      {/* --- Event & Commentary Feed --- */}
+      <section className="rounded-xl border border-white/10 bg-zinc-900 p-5 shadow-lg">
+        <h2 className="text-xs font-bold uppercase tracking-widest text-zinc-400">Fil Événementiel Chronologique</h2>
+        <ul className="mt-4 space-y-2">
           {[
             ...match.events.map((e) => ({ kind: "event" as const, minute: e.minute, sortKey: e.minute * 10, item: e })),
             ...match.commentary.map((c) => ({
@@ -275,21 +298,24 @@ export default async function AdminLiveMatchPage({ params }: { params: Promise<{
               item: c,
             })),
           ]
-            .sort((a, b) => a.sortKey - b.sortKey)
+            .sort((a, b) => b.sortKey - a.sortKey) // Du plus récent au plus ancien
             .map((row) =>
               row.kind === "event" ? (
                 <li
                   key={`e-${row.item.id}`}
-                  className="flex items-center justify-between rounded-md border border-white/10 bg-zinc-900 px-3 py-2 text-sm"
+                  className="flex items-center justify-between rounded-lg border border-white/10 bg-zinc-950 px-4 py-3 text-sm"
                 >
-                  <span>
-                    {row.item.minute}&apos; —{" "}
-                    {EVENT_TYPES.find((t) => t.value === row.item.eventType)?.label ?? row.item.eventType} —{" "}
-                    {row.item.player.firstName}{" "}
-                    {row.item.player.lastName} ({row.item.team.name})
-                  </span>
+                  <div className="flex items-center gap-3">
+                    <span className="font-mono text-xs font-bold text-brand-400">{row.item.minute}&apos;</span>
+                    <span className="font-semibold text-white">
+                      {EVENT_TYPES.find((t) => t.value === row.item.eventType)?.label ?? row.item.eventType}
+                    </span>
+                    <span className="text-gray-300">
+                      — {row.item.player.firstName} {row.item.player.lastName} ({row.item.team.name})
+                    </span>
+                  </div>
                   <form action={deleteEvent.bind(null, row.item.id)}>
-                    <ConfirmButton message="Supprimer cet événement ?" className="text-brand-600 hover:underline">
+                    <ConfirmButton message="Supprimer cet événement ?" className="text-xs text-rose-500 hover:underline">
                       Supprimer
                     </ConfirmButton>
                   </form>
@@ -297,13 +323,14 @@ export default async function AdminLiveMatchPage({ params }: { params: Promise<{
               ) : (
                 <li
                   key={`c-${row.item.id}`}
-                  className="flex items-center justify-between rounded-md border border-white/10 bg-zinc-900/60 px-3 py-2 text-sm italic text-gray-400"
+                  className="flex items-center justify-between rounded-lg border border-white/5 bg-zinc-950/50 px-4 py-3 text-sm italic text-gray-400"
                 >
-                  <span>
-                    {row.item.minute}&apos; — 💬 {row.item.text}
-                  </span>
+                  <div className="flex items-center gap-3">
+                    <span className="font-mono text-xs font-bold text-gray-500">{row.item.minute}&apos;</span>
+                    <span>💬 {row.item.text}</span>
+                  </div>
                   <form action={deleteCommentary.bind(null, row.item.id, matchId)}>
-                    <ConfirmButton message="Supprimer ce commentaire ?" className="not-italic text-brand-600 hover:underline">
+                    <ConfirmButton message="Supprimer ce commentaire ?" className="not-italic text-xs text-rose-500 hover:underline">
                       Supprimer
                     </ConfirmButton>
                   </form>

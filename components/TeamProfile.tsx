@@ -44,6 +44,11 @@ type TeamData = {
     foundedYear: number | null;
     colors: string | null;
     description: string | null;
+    address?: string | null;
+    website?: string | null;
+    contactEmail?: string | null;
+    contactPhone?: string | null;
+    isVerified?: boolean;
   };
   group: string | null;
   standing: {

@@ -3,7 +3,11 @@ import { prisma } from "@/lib/prisma";
 import TeamProfile from "@/components/TeamProfile";
 import type { Metadata } from "next";
 
-export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
   const { id } = await params;
   const team = await prisma.team.findUnique({
     where: { id: Number(id) },
@@ -18,7 +22,11 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   return { title, description, openGraph: { title, description } };
 }
 
-export default async function TeamPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function TeamPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
   const { id } = await params;
   const teamId = Number(id);
 
@@ -33,7 +41,15 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
     prisma.player.findMany({
       where: { teamId, status: "approved" },
       orderBy: { goals: "desc" },
-      select: { id: true, firstName: true, lastName: true, jerseyNumber: true, position: true, goals: true, photo: true },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        jerseyNumber: true,
+        position: true,
+        goals: true,
+        photo: true,
+      },
     }),
     prisma.standing.findFirst({ where: { teamId } }),
     prisma.match.findMany({
@@ -48,7 +64,14 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
     prisma.newsArticle.findMany({
       where: { teamId, published: true },
       orderBy: { publishedAt: "desc" },
-      select: { id: true, slug: true, title: true, excerpt: true, coverImage: true, publishedAt: true },
+      select: {
+        id: true,
+        slug: true,
+        title: true,
+        excerpt: true,
+        coverImage: true,
+        publishedAt: true,
+      },
     }),
   ]);
 
@@ -79,15 +102,25 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
         category: team.category,
         year: team.year,
         coach: team.coach,
-        captain: team.captain ? { firstName: team.captain.firstName, lastName: team.captain.lastName } : null,
+        captain: team.captain
+          ? {
+              firstName: team.captain.firstName,
+              lastName: team.captain.lastName,
+            }
+          : null,
         university: {
           name: team.university.name,
           shortName: team.university.shortName,
           logo: team.university.logo,
           city: team.university.city,
+          address: team.university.address,
           foundedYear: team.university.foundedYear,
           colors: team.university.colors,
           description: team.university.description,
+          website: team.university.website,
+          contactEmail: team.university.contactEmail,
+          contactPhone: team.university.contactPhone,
+          isVerified: team.university.isVerified,
         },
         group: standing?.group ?? null,
         standing: standing
@@ -111,7 +144,10 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
           : null
       }
       allMatches={serializedMatches}
-      articles={articles.map((a) => ({ ...a, publishedAt: a.publishedAt?.toISOString() ?? null }))}
+      articles={articles.map((a) => ({
+        ...a,
+        publishedAt: a.publishedAt?.toISOString() ?? null,
+      }))}
     />
   );
 }
