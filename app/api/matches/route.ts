@@ -69,12 +69,12 @@ export async function GET(req: NextRequest) {
         homeTeam: {
           id: m.homeTeam.id,
           name: m.homeTeam.name,
-          logo: m.homeTeam.university?.logo ?? null,
+          university: { logo: m.homeTeam.university?.logo ?? null },
         },
         awayTeam: {
           id: m.awayTeam.id,
           name: m.awayTeam.name,
-          logo: m.awayTeam.university?.logo ?? null,
+          university: { logo: m.awayTeam.university?.logo ?? null },
         },
         currentMinute:
           m.status === "live" || m.status === "halftime"
