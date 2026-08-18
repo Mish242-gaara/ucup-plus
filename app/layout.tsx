@@ -3,6 +3,7 @@ import "./globals.css";
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 
+// Configuration Viewport pour rendre l'application 100% responsive sur mobile
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
