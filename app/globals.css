@@ -2,6 +2,31 @@
 @tailwind components;
 @tailwind utilities;
 
+/* --- Barre de défilement moderne & élégante (Style Dashboard) --- */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(239, 68, 68, 0.6); /* Survol rouge brand */
+}
+
+/* Prise en charge Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+}
+
 @layer components {
   /* --- Admin (dark) form controls --- */
   .input {
@@ -45,5 +70,14 @@
 
   .animate-marquee:hover {
     animation-play-state: paused;
+  }
+
+  /* Utilitaire optionnel pour masquer complètement la barre sur un composant ciblé */
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
   }
 }
