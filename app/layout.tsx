@@ -1,10 +1,8 @@
 import type { Metadata, Viewport } from "next";
-// @ts-expect-error - CSS imports are handled by Next.js
 import "./globals.css";
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 
-// Configuration Viewport pour rendre l'application 100% responsive sur mobile
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
