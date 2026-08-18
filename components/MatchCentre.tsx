@@ -177,9 +177,6 @@ function LineupColumn({
   );
 }
 
-/* ==========================================================================
-   Composant Carte Joueur (Avatar + Capsule Nom/Numéro Style Flashscore)
-   ========================================================================== */
 function PlayerNode({ player }: { player: LineupEntry }) {
   const nameParts = player.playerName.trim().split(" ");
   const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1] : nameParts[0];
@@ -206,9 +203,6 @@ function PlayerNode({ player }: { player: LineupEntry }) {
   );
 }
 
-/* ==========================================================================
-   Terrain Tactique Visuel Complet (Espacement aéré style Flashscore)
-   ========================================================================== */
 function DualFacingPitch({
   homeTeam,
   awayTeam,
@@ -229,7 +223,6 @@ function DualFacingPitch({
   const sortedHome = [...homeStarters].sort((a, b) => (a.orderKey ?? 0) - (b.orderKey ?? 0));
   const sortedAway = [...awayStarters].sort((a, b) => (a.orderKey ?? 0) - (b.orderKey ?? 0));
 
-  // Équipe Domicile (Haut)
   const homeKeeper = sortedHome[0];
   const homeOutfield = sortedHome.slice(1);
   const homeRows: LineupEntry[][] = [];
@@ -239,7 +232,6 @@ function DualFacingPitch({
     hIdx += count;
   });
 
-  // Équipe Extérieur (Bas)
   const awayKeeper = sortedAway[0];
   const awayOutfield = sortedAway.slice(1);
   const awayRows: LineupEntry[][] = [];
@@ -253,29 +245,22 @@ function DualFacingPitch({
     <div className="relative mx-auto w-full max-w-lg overflow-hidden rounded-2xl border border-slate-700/50 bg-[#0b181f] p-4 shadow-2xl">
       <div className="absolute inset-0 bg-[radial-gradient(#1e3a8a_1px,transparent_1px)] [background-size:20px_20px] opacity-10" />
 
-      {/* Surface Haut */}
       <div className="pointer-events-none absolute top-0 left-1/2 h-20 w-44 -translate-x-1/2 rounded-b-xl border border-t-0 border-slate-500/30 bg-slate-500/5" />
       <div className="pointer-events-none absolute top-0 left-1/2 h-8 w-20 -translate-x-1/2 rounded-b-md border border-t-0 border-slate-500/30" />
       <div className="pointer-events-none absolute top-20 left-1/2 h-10 w-24 -translate-x-1/2 rounded-b-full border border-slate-500/20" />
 
-      {/* Ligne Médiane & Rond Central */}
       <div className="pointer-events-none absolute top-1/2 left-0 w-full border-t border-slate-500/40" />
       <div className="pointer-events-none absolute top-1/2 left-1/2 h-28 w-28 -translate-x-1/2 -translate-y-1/2 rounded-full border border-slate-500/40" />
 
-      {/* Surface Bas */}
       <div className="pointer-events-none absolute bottom-0 left-1/2 h-20 w-44 -translate-x-1/2 rounded-t-xl border border-b-0 border-slate-500/30 bg-slate-500/5" />
       <div className="pointer-events-none absolute bottom-0 left-1/2 h-8 w-20 -translate-x-1/2 rounded-t-md border border-b-0 border-slate-500/30" />
       <div className="pointer-events-none absolute bottom-20 left-1/2 h-10 w-24 -translate-x-1/2 rounded-t-full border border-slate-500/20" />
 
-      {/* Terrain global aéré */}
       <div className="relative z-10 flex min-h-[700px] flex-col justify-between py-2 sm:min-h-[780px]">
-        {/* Équipe Domicile (Haut) */}
         <div className="flex flex-col justify-between space-y-4">
-          {/* Gardien */}
           <div className="flex justify-center">
             {homeKeeper && <PlayerNode player={homeKeeper} />}
           </div>
-          {/* Lignes de champ */}
           {homeRows.map((row, rIdx) => {
             const isLastRow = rIdx === homeRows.length - 1;
             return (
@@ -291,13 +276,10 @@ function DualFacingPitch({
           })}
         </div>
 
-        {/* Équipe Extérieur (Bas) */}
         <div className="flex flex-col-reverse justify-between space-y-4 space-y-reverse">
-          {/* Gardien */}
           <div className="flex justify-center">
             {awayKeeper && <PlayerNode player={awayKeeper} />}
           </div>
-          {/* Lignes de champ */}
           {awayRows.map((row, rIdx) => {
             const isLastRow = rIdx === awayRows.length - 1;
             return (
@@ -329,7 +311,6 @@ export default function MatchCentre({
   const initialTab = TAB_PARAM[searchParams.get("tab") ?? ""] ?? "Scores";
   const [tab, setTab] = useState<(typeof TABS)[number]>(initialTab);
 
-  // Vue : terrain (pitch) ou liste classique (list)
   const [lineupViewMode, setLineupViewMode] = useState<"pitch" | "list">("pitch");
 
   const isLive = data.status === "live" || data.status === "halftime";
@@ -344,6 +325,8 @@ export default function MatchCentre({
   const awayStarters = data.lineups?.away?.starters ?? [];
   const homeSubstitutes = data.lineups?.home?.substitutes ?? [];
   const awaySubstitutes = data.lineups?.away?.substitutes ?? [];
+
+  const totalH2H = h2hSummary.homeWins + h2hSummary.draws + h2hSummary.awayWins;
 
   return (
     <div className="overflow-hidden rounded-2xl bg-zinc-950 shadow-2xl">
@@ -494,50 +477,76 @@ export default function MatchCentre({
 
         {tab === "Face-à-face" && (
           <div>
-            <div className="flex items-center justify-around text-center text-sm">
-              <div>
-                <p className="text-2xl font-extrabold text-white">{h2hSummary.homeWins}</p>
-                <p className="text-xs text-gray-500">{data.homeTeam.name}</p>
+            {totalH2H === 0 && h2h.length === 0 ? (
+              <div className="rounded-xl border border-white/5 bg-zinc-900/50 py-10 text-center">
+                <p className="text-base font-semibold text-white">Premier affrontement direct</p>
+                <p className="mt-1 text-xs text-gray-400">
+                  {data.homeTeam.name} et {data.awayTeam.name} ne se sont encore jamais affrontées en compétition.
+                </p>
               </div>
-              <div>
-                <p className="text-2xl font-extrabold text-gray-400">{h2hSummary.draws}</p>
-                <p className="text-xs text-gray-500">Nuls</p>
-              </div>
-              <div>
-                <p className="text-2xl font-extrabold text-white">{h2hSummary.awayWins}</p>
-                <p className="text-xs text-gray-500">{data.awayTeam.name}</p>
-              </div>
-            </div>
-
-            <div className="mt-6 space-y-2">
-              {h2h.length === 0 ? (
-                <p className="text-sm text-gray-500">Ces deux équipes ne se sont jamais affrontées.</p>
-              ) : (
-                h2h.map((m) => (
-                  <div
-                    key={m.id}
-                    className="flex items-center justify-between rounded-lg bg-white/5 px-3 py-2 text-sm"
-                  >
-                    <span className="text-gray-400">
-                      {new Date(m.matchDate).toLocaleDateString("fr-FR", {
-                        day: "2-digit",
-                        month: "short",
-                        year: "numeric",
-                      })}
-                    </span>
-                    <span className="text-white">
-                      {m.homeTeamName} <span className="font-bold">{m.homeScore} - {m.awayScore}</span> {m.awayTeamName}
-                    </span>
+            ) : (
+              <>
+                <div className="flex items-center justify-around text-center text-sm">
+                  <div>
+                    <p className="text-3xl font-extrabold text-white">{h2hSummary.homeWins}</p>
+                    <p className="mt-1 text-xs font-medium text-gray-400">{data.homeTeam.name}</p>
                   </div>
-                ))
-              )}
-            </div>
+                  <div>
+                    <p className="text-3xl font-extrabold text-gray-400">{h2hSummary.draws}</p>
+                    <p className="mt-1 text-xs font-medium text-gray-400">Nuls</p>
+                  </div>
+                  <div>
+                    <p className="text-3xl font-extrabold text-white">{h2hSummary.awayWins}</p>
+                    <p className="mt-1 text-xs font-medium text-gray-400">{data.awayTeam.name}</p>
+                  </div>
+                </div>
+
+                {totalH2H > 0 && (
+                  <div className="mt-4 flex h-2 overflow-hidden rounded-full bg-zinc-800">
+                    <div
+                      style={{ width: `${(h2hSummary.homeWins / totalH2H) * 100}%` }}
+                      className="bg-emerald-500"
+                    />
+                    <div
+                      style={{ width: `${(h2hSummary.draws / totalH2H) * 100}%` }}
+                      className="bg-zinc-500"
+                    />
+                    <div
+                      style={{ width: `${(h2hSummary.awayWins / totalH2H) * 100}%` }}
+                      className="bg-blue-500"
+                    />
+                  </div>
+                )}
+
+                <div className="mt-6 space-y-2">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+                    Historique des confrontations
+                  </p>
+                  {h2h.map((m) => (
+                    <div
+                      key={m.id}
+                      className="flex items-center justify-between rounded-lg bg-zinc-900/80 px-4 py-3 text-sm transition-colors hover:bg-zinc-900"
+                    >
+                      <span className="text-xs text-gray-400">
+                        {new Date(m.matchDate).toLocaleDateString("fr-FR", {
+                          day: "2-digit",
+                          month: "short",
+                          year: "numeric",
+                        })}
+                      </span>
+                      <span className="text-white">
+                        {m.homeTeamName} <span className="mx-1 font-bold text-amber-400">{m.homeScore} - {m.awayScore}</span> {m.awayTeamName}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         )}
 
         {tab === "Compositions" && (
           <div className="space-y-6">
-            {/* Basculeur de mode : Terrain vs Liste */}
             <div className="flex items-center justify-end">
               <div className="flex items-center gap-1 rounded-lg bg-black/40 p-1">
                 <button
@@ -561,13 +570,11 @@ export default function MatchCentre({
               </div>
             </div>
 
-            {/* Mode Affichage Terrain Visuel Flashscore */}
             {lineupViewMode === "pitch" ? (
               homeStarters.length === 0 && awayStarters.length === 0 ? (
                 <p className="py-8 text-center text-sm text-gray-500">Les compositions n'ont pas encore été publiées.</p>
               ) : (
                 <div className="space-y-6">
-                  {/* Indication des formations */}
                   <div className="flex items-center justify-between px-2 text-xs font-semibold text-gray-400">
                     <span>
                       {data.homeTeam.name} ({data.homeTeam.formation ?? "4-3-3"})
@@ -577,7 +584,6 @@ export default function MatchCentre({
                     </span>
                   </div>
 
-                  {/* Terrain complet des 22 joueurs */}
                   <DualFacingPitch
                     homeTeam={data.homeTeam}
                     awayTeam={data.awayTeam}
@@ -585,7 +591,6 @@ export default function MatchCentre({
                     awayStarters={awayStarters}
                   />
 
-                  {/* Remplaçants sous le terrain */}
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div className="rounded-xl border border-white/5 bg-zinc-900/60 p-4">
                       <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-400">
@@ -630,7 +635,6 @@ export default function MatchCentre({
                 </div>
               )
             ) : (
-              /* Mode Affichage Liste Classique */
               <div className="grid gap-8 sm:grid-cols-2">
                 <div>
                   {data.homeTeam.formation && (

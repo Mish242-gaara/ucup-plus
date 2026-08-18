@@ -55,7 +55,7 @@ export default async function MatchesPage() {
 
       {/* Formulaire de création de match */}
       <form action={createMatch} className="mt-6 grid max-w-2xl grid-cols-1 sm:grid-cols-2 gap-3">
-        <select name="homeTeamId" required className="input w-full">
+        <select name="homeTeamId" required aria-label="Équipe domicile" className="input w-full">
           <option value="">Équipe domicile…</option>
           {teams.map((t) => (
             <option key={t.id} value={t.id}>
@@ -64,7 +64,7 @@ export default async function MatchesPage() {
           ))}
         </select>
 
-        <select name="awayTeamId" required className="input w-full">
+        <select name="awayTeamId" required aria-label="Équipe visiteuse" className="input w-full">
           <option value="">Équipe visiteuse…</option>
           {teams.map((t) => (
             <option key={t.id} value={t.id}>
@@ -73,12 +73,18 @@ export default async function MatchesPage() {
           ))}
         </select>
 
-        <input name="matchDate" type="datetime-local" required className="input col-span-1 sm:col-span-2 w-full" />
+        <input
+          name="matchDate"
+          type="datetime-local"
+          required
+          aria-label="Date et heure du match"
+          className="input col-span-1 sm:col-span-2 w-full"
+        />
         <input name="venue" placeholder="Lieu" className="input w-full" />
         <input name="group" placeholder="Groupe (A, B…)" className="input w-full" />
         <input name="round" placeholder="Phase (Quart, Demi, Finale…)" className="input w-full" />
-        
-        <select name="matchType" className="input w-full" defaultValue="tournament">
+
+        <select name="matchType" className="input w-full" defaultValue="tournament" aria-label="Type de match">
           <option value="tournament">Tournoi</option>
           <option value="friendly">Amical</option>
         </select>
@@ -117,7 +123,10 @@ export default async function MatchesPage() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/5 pb-3">
               <div>
                 <p className="font-semibold text-white text-sm sm:text-base">
-                  {m.homeTeam.name} <span className="text-brand-400 font-bold">{m.homeScore}</span> - <span className="text-brand-400 font-bold">{m.awayScore}</span> {m.awayTeam.name}
+                  {m.homeTeam.name}{" "}
+                  <span className="text-brand-400 font-bold">{m.homeScore ?? 0}</span> -{" "}
+                  <span className="text-brand-400 font-bold">{m.awayScore ?? 0}</span>{" "}
+                  {m.awayTeam.name}
                 </p>
                 <p className="text-xs text-gray-400 mt-1">
                   {new Date(m.matchDate).toLocaleString("fr-FR")} · {m.venue ?? "lieu à définir"} ·{" "}
@@ -143,18 +152,41 @@ export default async function MatchesPage() {
 
             <div className="mt-3 flex flex-wrap items-center gap-3 text-xs sm:text-sm">
               {/* Formulaire Score */}
-              <form action={handleUpdateScore.bind(null, m.id)} className="flex items-center gap-1.5 bg-zinc-950 p-1.5 rounded-lg border border-zinc-800">
-                <input name="home" type="number" defaultValue={m.homeScore} className="input w-12 text-center text-xs py-1 px-1" />
+              <form
+                action={handleUpdateScore.bind(null, m.id)}
+                className="flex items-center gap-1.5 bg-zinc-950 p-1.5 rounded-lg border border-zinc-800"
+              >
+                <input
+                  name="home"
+                  type="number"
+                  defaultValue={m.homeScore ?? 0}
+                  aria-label="Score domicile"
+                  className="input w-12 text-center text-xs py-1 px-1"
+                />
                 <span className="text-gray-500">-</span>
-                <input name="away" type="number" defaultValue={m.awayScore} className="input w-12 text-center text-xs py-1 px-1" />
+                <input
+                  name="away"
+                  type="number"
+                  defaultValue={m.awayScore ?? 0}
+                  aria-label="Score extérieur"
+                  className="input w-12 text-center text-xs py-1 px-1"
+                />
                 <button type="submit" className="text-xs text-brand-500 hover:underline px-1 font-medium">
                   Mettre à jour
                 </button>
               </form>
 
               {/* Formulaire Statut */}
-              <form action={handleUpdateStatus.bind(null, m.id)} className="flex items-center gap-1.5 bg-zinc-950 p-1.5 rounded-lg border border-zinc-800">
-                <select name="status" defaultValue={m.status} className="input text-xs py-1 px-2">
+              <form
+                action={handleUpdateStatus.bind(null, m.id)}
+                className="flex items-center gap-1.5 bg-zinc-950 p-1.5 rounded-lg border border-zinc-800"
+              >
+                <select
+                  name="status"
+                  defaultValue={m.status}
+                  aria-label="Statut du match"
+                  className="input text-xs py-1 px-2"
+                >
                   {STATUSES.map((s) => (
                     <option key={s} value={s}>
                       {STATUS_LABELS[s]}
