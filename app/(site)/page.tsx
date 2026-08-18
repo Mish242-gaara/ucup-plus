@@ -56,6 +56,7 @@ export default async function HomePage() {
             homeLogo={nextMatch.homeTeam.university.logo}
             awayTeam={nextMatch.awayTeam.name}
             awayLogo={nextMatch.awayTeam.university.logo}
+            location={nextMatch.venue}
             matchDate={new Date(nextMatch.matchDate).toLocaleDateString("fr-FR", {
               weekday: "long",
               day: "numeric",

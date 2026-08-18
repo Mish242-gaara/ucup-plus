@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import TeamLogo from "@/components/TeamLogo";
 
@@ -10,7 +10,7 @@ type Props = {
   awayTeam: string;
   awayLogo: string | null;
   matchDate: string;
-  location?: string;
+  location?: string | null;
 };
 
 export default function FeaturedMatchHero({
@@ -19,7 +19,7 @@ export default function FeaturedMatchHero({
   awayTeam,
   awayLogo,
   matchDate,
-  location = "Camp Militaire",
+  location,
 }: Props) {
   const [votes, setVotes] = useState({ home: 45, draw: 20, away: 35 });
   const [voted, setVoted] = useState<string | null>(null);
@@ -105,7 +105,7 @@ export default function FeaturedMatchHero({
       </div>
 
       <div className="flex items-center justify-between border-t border-white/10 mt-4 pt-3 text-xs text-gray-400">
-        <span>📍 {location}</span>
+        <span>📍 {location || "Terrain non défini"}</span>
         <Link href="/matches" className="font-bold text-red-400 hover:text-red-300">
           Voir le calendrier →
         </Link>
