@@ -1,13 +1,21 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
+// @ts-expect-error - CSS imports are handled by Next.js
 import "./globals.css";
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+
+// Configuration Viewport pour rendre l'application 100% responsive sur mobile
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+};
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
     default: "UCUP 2026",
-    template: "%s",
+    template: "%s | UCUP 2026",
   },
   description: "Championnat universitaire de football - UCUP 2026",
   openGraph: {
@@ -19,8 +27,10 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="fr">
-      <body className="antialiased">{children}</body>
+    <html lang="fr" className="dark">
+      <body className="antialiased bg-zinc-950 text-white min-h-screen">
+        {children}
+      </body>
     </html>
   );
 }
