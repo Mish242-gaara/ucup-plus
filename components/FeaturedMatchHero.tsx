@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useEffect, useTransition } from "react";
 import Link from "next/link";
 import TeamLogo from "@/components/TeamLogo";
 import { voteMatch } from "@/app/actions/vote";
@@ -38,6 +38,14 @@ export default function FeaturedMatchHero({
     away: initialAwayVotes,
   });
 
+  // 1. Vérification du localStorage au chargement de la page
+  useEffect(() => {
+    const savedVote = localStorage.getItem(`voted_match_${matchId}`);
+    if (savedVote) {
+      setVoted(savedVote);
+    }
+  }, [matchId]);
+
   const totalVotes = votes.home + votes.draw + votes.away;
 
   const getPercentage = (count: number) => {
@@ -48,11 +56,14 @@ export default function FeaturedMatchHero({
   const handleVote = (choice: "home" | "draw" | "away") => {
     if (voted || isPending) return;
 
-    // Mise à jour optimiste côté client
+    // 2. Enregistrer le choix dans le localStorage pour persister après F5
+    localStorage.setItem(`voted_match_${matchId}`, choice);
+    
+    // 3. Mise à jour optimiste de l'UI
     setVoted(choice);
     setVotes((prev) => ({ ...prev, [choice]: prev[choice] + 1 }));
 
-    // Persistance en base de données
+    // 4. Inscription en base de données
     startTransition(async () => {
       await voteMatch(matchId, choice);
     });
@@ -128,6 +139,11 @@ export default function FeaturedMatchHero({
             {awayTeam} ({getPercentage(votes.away)}%)
           </button>
         </div>
+        {voted && (
+          <p className="text-[10px] text-center text-green-400 mt-2 font-medium">
+            ✓ Votre vote a été enregistré pour ce match.
+          </p>
+        )}
       </div>
 
       <div className="flex items-center justify-between border-t border-white/10 mt-4 pt-3 text-xs text-gray-400">
