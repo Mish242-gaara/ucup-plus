@@ -1,36 +1,62 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import Link from "next/link";
 import TeamLogo from "@/components/TeamLogo";
+import { voteMatch } from "@/app/actions/vote";
 
 type Props = {
+  matchId: number;
   homeTeam: string;
   homeLogo: string | null;
   awayTeam: string;
   awayLogo: string | null;
   matchDate: string;
   location?: string | null;
+  initialHomeVotes?: number;
+  initialDrawVotes?: number;
+  initialAwayVotes?: number;
 };
 
 export default function FeaturedMatchHero({
+  matchId,
   homeTeam,
   homeLogo,
   awayTeam,
   awayLogo,
   matchDate,
   location,
+  initialHomeVotes = 0,
+  initialDrawVotes = 0,
+  initialAwayVotes = 0,
 }: Props) {
-  const [votes, setVotes] = useState({ home: 45, draw: 20, away: 35 });
+  const [isPending, startTransition] = useTransition();
   const [voted, setVoted] = useState<string | null>(null);
-
-  const handleVote = (choice: "home" | "draw" | "away") => {
-    if (voted) return;
-    setVoted(choice);
-    setVotes((prev) => ({ ...prev, [choice]: prev[choice] + 1 }));
-  };
+  const [votes, setVotes] = useState({
+    home: initialHomeVotes,
+    draw: initialDrawVotes,
+    away: initialAwayVotes,
+  });
 
   const totalVotes = votes.home + votes.draw + votes.away;
+
+  const getPercentage = (count: number) => {
+    if (totalVotes === 0) return 0;
+    return Math.round((count / totalVotes) * 100);
+  };
+
+  const handleVote = (choice: "home" | "draw" | "away") => {
+    if (voted || isPending) return;
+
+    // Mise à jour optimiste côté client
+    setVoted(choice);
+    setVotes((prev) => ({ ...prev, [choice]: prev[choice] + 1 }));
+
+    // Persistance en base de données
+    startTransition(async () => {
+      await voteMatch(matchId, choice);
+    });
+  };
 
   return (
     <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-zinc-900 via-slate-900 to-zinc-950 p-6 text-white shadow-xl border border-white/10">
@@ -68,38 +94,38 @@ export default function FeaturedMatchHero({
         </div>
       </div>
 
-      {/* Module Pronostics */}
+      {/* Module Pronostics Dynamic */}
       <div className="mt-4 rounded-xl bg-white/5 p-3 border border-white/5">
         <p className="text-xs font-bold text-center text-gray-300 mb-2">
-          🗳️ Sondage : Qui va l'emporter ?
+          🗳️ Sondage : Qui va l'emporter ? {totalVotes > 0 && `(${totalVotes} vote${totalVotes > 1 ? "s" : ""})`}
         </p>
         <div className="grid grid-cols-3 gap-2">
           <button
             onClick={() => handleVote("home")}
-            disabled={!!voted}
+            disabled={!!voted || isPending}
             className={`py-1.5 rounded text-xs font-bold transition ${
               voted === "home" ? "bg-red-600 text-white" : "bg-white/10 hover:bg-white/20"
             }`}
           >
-            {homeTeam} ({Math.round((votes.home / totalVotes) * 100)}%)
+            {homeTeam} ({getPercentage(votes.home)}%)
           </button>
           <button
             onClick={() => handleVote("draw")}
-            disabled={!!voted}
+            disabled={!!voted || isPending}
             className={`py-1.5 rounded text-xs font-bold transition ${
               voted === "draw" ? "bg-gray-600 text-white" : "bg-white/10 hover:bg-white/20"
             }`}
           >
-            Nul ({Math.round((votes.draw / totalVotes) * 100)}%)
+            Nul ({getPercentage(votes.draw)}%)
           </button>
           <button
             onClick={() => handleVote("away")}
-            disabled={!!voted}
+            disabled={!!voted || isPending}
             className={`py-1.5 rounded text-xs font-bold transition ${
               voted === "away" ? "bg-red-600 text-white" : "bg-white/10 hover:bg-white/20"
             }`}
           >
-            {awayTeam} ({Math.round((votes.away / totalVotes) * 100)}%)
+            {awayTeam} ({getPercentage(votes.away)}%)
           </button>
         </div>
       </div>
