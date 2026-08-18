@@ -20,7 +20,7 @@ export async function generateMetadata({
   const scoreLabel =
     match.status === "scheduled"
       ? "vs"
-      : `${match.homeScore} - ${match.awayScore}`;
+      : `${match.homeScore ?? 0} - ${match.awayScore ?? 0}`;
   const title = `${match.homeTeam.name} ${scoreLabel} ${match.awayTeam.name} — UCUP 2026`;
   const description =
     [match.round, match.venue].filter(Boolean).join(" · ") || "UCUP 2026";
@@ -166,8 +166,8 @@ export default async function MatchPage({
     matchDate: m.matchDate.toISOString(),
     homeTeamName: m.homeTeam.name,
     awayTeamName: m.awayTeam.name,
-    homeScore: m.homeScore,
-    awayScore: m.awayScore,
+    homeScore: m.homeScore ?? 0,
+    awayScore: m.awayScore ?? 0,
   }));
 
   const h2hAdvanced = {
@@ -199,7 +199,7 @@ export default async function MatchPage({
     position: l.position || l.startingPosition,
     orderKey: l.orderKey,
     role: l.role,
-    photo: l.player.photo || l.player.photoPath || null,
+    photoUrl: l.player.photo || l.player.photoPath || null,
   });
 
   const commentaryEntries = (match.commentary ?? []) as {
@@ -214,8 +214,8 @@ export default async function MatchPage({
     group: match.group,
     venue: match.venue,
     referee: match.referee,
-    homeScore: match.homeScore,
-    awayScore: match.awayScore,
+    homeScore: match.homeScore ?? 0,
+    awayScore: match.awayScore ?? 0,
     homeTeam: {
       id: match.homeTeam.id,
       name: match.homeTeam.name,
@@ -242,24 +242,24 @@ export default async function MatchPage({
         match.homePossession ?? 50,
         match.awayPossession ?? 50,
       ] as [number, number],
-      shots: [match.homeShots, match.awayShots] as [number, number],
+      shots: [match.homeShots ?? 0, match.awayShots ?? 0] as [number, number],
       shotsOnTarget: [
         match.homeShotsOnTarget ?? 0,
         match.awayShotsOnTarget ?? 0,
       ] as [number, number],
-      corners: [match.homeCorners, match.awayCorners] as [number, number],
-      fouls: [match.homeFouls, match.awayFouls] as [number, number],
-      offsides: [match.homeOffsides, match.awayOffsides] as [number, number],
-      saves: [match.homeSaves, match.awaySaves] as [number, number],
-      freeKicks: [match.homeFreeKicks, match.awayFreeKicks] as [number, number],
-      throwIns: [match.homeThrowIns, match.awayThrowIns] as [number, number],
-      goalkicks: [match.homeGoalkicks, match.awayGoalkicks] as [number, number],
-      penalties: [match.homePenalties, match.awayPenalties] as [number, number],
+      corners: [match.homeCorners ?? 0, match.awayCorners ?? 0] as [number, number],
+      fouls: [match.homeFouls ?? 0, match.awayFouls ?? 0] as [number, number],
+      offsides: [match.homeOffsides ?? 0, match.awayOffsides ?? 0] as [number, number],
+      saves: [match.homeSaves ?? 0, match.awaySaves ?? 0] as [number, number],
+      freeKicks: [match.homeFreeKicks ?? 0, match.awayFreeKicks ?? 0] as [number, number],
+      throwIns: [match.homeThrowIns ?? 0, match.awayThrowIns ?? 0] as [number, number],
+      goalkicks: [match.homeGoalkicks ?? 0, match.awayGoalkicks ?? 0] as [number, number],
+      penalties: [match.homePenalties ?? 0, match.awayPenalties ?? 0] as [number, number],
       yellowCards: [
-        match.homeYellowCards,
-        match.awayYellowCards,
+        match.homeYellowCards ?? 0,
+        match.awayYellowCards ?? 0,
       ] as [number, number],
-      redCards: [match.homeRedCards, match.awayRedCards] as [number, number],
+      redCards: [match.homeRedCards ?? 0, match.awayRedCards ?? 0] as [number, number],
     },
     events: match.events.map((e) => ({
       id: e.id,
