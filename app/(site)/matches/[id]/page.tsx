@@ -28,6 +28,22 @@ export async function generateMetadata({
   return { title, description, openGraph: { title, description } };
 }
 
+type MatchResult = "V" | "N" | "D";
+
+function getMatchResultForTeam(
+  match: { homeTeamId: number; awayTeamId: number; homeScore: number | null; awayScore: number | null },
+  teamId: number
+): MatchResult | null {
+  if (match.homeScore === null || match.awayScore === null) return null;
+  const isHome = match.homeTeamId === teamId;
+  const teamScore = isHome ? match.homeScore : match.awayScore;
+  const opponentScore = isHome ? match.awayScore : match.homeScore;
+
+  if (teamScore > opponentScore) return "V";
+  if (teamScore === opponentScore) return "N";
+  return "D";
+}
+
 export default async function MatchPage({
   params,
 }: {
@@ -38,6 +54,7 @@ export default async function MatchPage({
 
   if (isNaN(matchId)) notFound();
 
+  // 1. Récupération du match principal
   const match = await prisma.match.findUnique({
     where: { id: matchId },
     include: {
@@ -54,21 +71,97 @@ export default async function MatchPage({
 
   if (!match) notFound();
 
-  const h2hMatches = await prisma.match.findMany({
-    where: {
-      status: "finished",
-      id: { not: matchId },
-      OR: [
-        { homeTeamId: match.homeTeamId, awayTeamId: match.awayTeamId },
-        { homeTeamId: match.awayTeamId, awayTeamId: match.homeTeamId },
-      ],
-    },
-    include: { homeTeam: true, awayTeam: true },
-    orderBy: { matchDate: "desc" },
-    take: 5,
-  });
+  // 2. Requêtes de données pour le H2H et la forme récente des deux équipes
+  const [h2hMatches, homeRecentMatches, awayRecentMatches] = await Promise.all([
+    prisma.match.findMany({
+      where: {
+        status: "finished",
+        id: { not: matchId },
+        OR: [
+          { homeTeamId: match.homeTeamId, awayTeamId: match.awayTeamId },
+          { homeTeamId: match.awayTeamId, awayTeamId: match.homeTeamId },
+        ],
+      },
+      include: { homeTeam: true, awayTeam: true },
+      orderBy: { matchDate: "desc" },
+      take: 10,
+    }),
+    prisma.match.findMany({
+      where: {
+        status: "finished",
+        id: { not: matchId },
+        OR: [{ homeTeamId: match.homeTeamId }, { awayTeamId: match.homeTeamId }],
+      },
+      orderBy: { matchDate: "desc" },
+      take: 5,
+    }),
+    prisma.match.findMany({
+      where: {
+        status: "finished",
+        id: { not: matchId },
+        OR: [{ homeTeamId: match.awayTeamId }, { awayTeamId: match.awayTeamId }],
+      },
+      orderBy: { matchDate: "desc" },
+      take: 5,
+    }),
+  ]);
 
-  const h2h = h2hMatches.map((m) => ({
+  // 3. Calcul de la forme récente (Series)
+  const homeFormRecent: MatchResult[] = homeRecentMatches
+    .map((m) => getMatchResultForTeam(m, match.homeTeamId))
+    .filter((res): res is MatchResult => res !== null)
+    .reverse();
+
+  const awayFormRecent: MatchResult[] = awayRecentMatches
+    .map((m) => getMatchResultForTeam(m, match.awayTeamId))
+    .filter((res): res is MatchResult => res !== null)
+    .reverse();
+
+  const calculateFormPoints = (form: MatchResult[]) =>
+    form.reduce((acc, r) => acc + (r === "V" ? 3 : r === "N" ? 1 : 0), 0);
+
+  const homeFormPoints = calculateFormPoints(homeFormRecent);
+  const awayFormPoints = calculateFormPoints(awayFormRecent);
+
+  // 4. Calcul de l'historique direct (H2H Summary)
+  const h2hSummary = h2hMatches.reduce(
+    (acc, m) => {
+      const homeIsCurrentHome = m.homeTeamId === match.homeTeamId;
+      const currentHomeScore = homeIsCurrentHome ? m.homeScore : m.awayScore;
+      const currentAwayScore = homeIsCurrentHome ? m.awayScore : m.homeScore;
+
+      if (currentHomeScore !== null && currentAwayScore !== null) {
+        if (currentHomeScore > currentAwayScore) acc.homeWins++;
+        else if (currentAwayScore > currentHomeScore) acc.awayWins++;
+        else acc.draws++;
+      }
+      return acc;
+    },
+    { homeWins: 0, awayWins: 0, draws: 0 }
+  );
+
+  // 5. Algorithme simple de probabilités (Forme 60% + H2H 40% + Avantage domicile)
+  const maxFormPoints = 15;
+  const homeFormRating = homeFormPoints / maxFormPoints;
+  const awayFormRating = awayFormPoints / maxFormPoints;
+
+  const totalH2H = h2hMatches.length;
+  const homeH2HRating = totalH2H > 0 ? h2hSummary.homeWins / totalH2H : 0.33;
+  const awayH2HRating = totalH2H > 0 ? h2hSummary.awayWins / totalH2H : 0.33;
+  const drawH2HRating = totalH2H > 0 ? h2hSummary.draws / totalH2H : 0.34;
+
+  const rawHome = homeFormRating * 0.6 + homeH2HRating * 0.4 + 0.05; // +5% domicile
+  const rawAway = awayFormRating * 0.6 + awayH2HRating * 0.4;
+  const rawDraw = 0.25 + drawH2HRating * 0.15;
+
+  const totalRaw = rawHome + rawAway + rawDraw;
+
+  const homeWinProb = Math.round((rawHome / totalRaw) * 100);
+  const awayWinProb = Math.round((rawAway / totalRaw) * 100);
+  const drawProb = 100 - homeWinProb - awayWinProb;
+
+  // 6. Formatage des données H2H basiques
+  const h2h = h2hMatches.slice(0, 5).map((m) => ({
     id: m.id,
     matchDate: m.matchDate.toISOString(),
     homeTeamName: m.homeTeam.name,
@@ -77,18 +170,19 @@ export default async function MatchPage({
     awayScore: m.awayScore,
   }));
 
-  const h2hSummary = h2hMatches.reduce(
-    (acc, m) => {
-      const homeIsCurrentHome = m.homeTeamId === match.homeTeamId;
-      const currentHomeScore = homeIsCurrentHome ? m.homeScore : m.awayScore;
-      const currentAwayScore = homeIsCurrentHome ? m.awayScore : m.homeScore;
-      if (currentHomeScore > currentAwayScore) acc.homeWins++;
-      else if (currentAwayScore > currentHomeScore) acc.awayWins++;
-      else acc.draws++;
-      return acc;
+  const h2hAdvanced = {
+    homeForm: { recent: homeFormRecent, points: homeFormPoints },
+    awayForm: { recent: awayFormRecent, points: awayFormPoints },
+    probabilities: {
+      homeWin: homeWinProb,
+      draw: drawProb,
+      awayWin: awayWinProb,
     },
-    { homeWins: 0, awayWins: 0, draws: 0 }
-  );
+    h2hSummary: {
+      ...h2hSummary,
+      totalMatches: totalH2H,
+    },
+  };
 
   const elapsedSeconds = getElapsedSeconds(match);
   const homeLineups = match.matchLineups.filter(
@@ -214,6 +308,7 @@ export default async function MatchPage({
         initialData={initialData}
         h2h={h2h}
         h2hSummary={h2hSummary}
+        h2hAdvanced={h2hAdvanced}
       />
     </main>
   );

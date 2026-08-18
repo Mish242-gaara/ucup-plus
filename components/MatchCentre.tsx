@@ -6,7 +6,9 @@ import { Trophy, LayoutGrid, List } from "lucide-react";
 import { useRealtime } from "@/lib/hooks/useRealtime";
 import TeamLogo from "@/components/TeamLogo";
 
-type LineupEntry = {
+export type MatchResult = "V" | "N" | "D";
+
+export type LineupEntry = {
   playerId: number;
   playerName: string;
   jerseyNumber: number;
@@ -16,7 +18,7 @@ type LineupEntry = {
   photoUrl?: string | null;
 };
 
-type LiveData = {
+export type LiveData = {
   status: string;
   round: string | null;
   group: string | null;
@@ -48,6 +50,30 @@ type LiveData = {
     away: { starters: LineupEntry[]; substitutes: LineupEntry[] };
   };
 };
+
+export type H2HMatch = {
+  id: number;
+  matchDate: string;
+  homeTeamName: string;
+  awayTeamName: string;
+  homeScore: number;
+  awayScore: number;
+};
+
+export interface H2HAdvancedData {
+  homeForm: { recent: MatchResult[]; points: number };
+  awayForm: { recent: MatchResult[]; points: number };
+  probabilities: { homeWin: number; draw: number; awayWin: number };
+  h2hSummary: { homeWins: number; draws: number; awayWins: number; totalMatches: number };
+}
+
+export interface MatchCentreProps {
+  matchId: number;
+  initialData: LiveData;
+  h2h?: H2HMatch[];
+  h2hSummary?: { homeWins: number; awayWins: number; draws: number };
+  h2hAdvanced?: H2HAdvancedData;
+}
 
 const EVENT_ICON: Record<string, string> = {
   goal: "⚽",
@@ -113,7 +139,7 @@ function LineupColumn({
   data,
 }: {
   teamName: string;
-  data: { starters: LineupEntry[]; substitutes: LineupEntry[] };
+  data?: { starters: LineupEntry[]; substitutes: LineupEntry[] };
 }) {
   const starters = [...(data?.starters ?? [])].sort((a, b) => (a.orderKey ?? 0) - (b.orderKey ?? 0));
   const substitutes = data?.substitutes ?? [];
@@ -179,10 +205,6 @@ function PlayerNode({ player }: { player: LineupEntry }) {
     </div>
   );
 }
-
-/* ==========================================================================
-   Terrain Tactique Visuel Complet (Les 2 Équipes en Vis-à-Vis)
-   ========================================================================== */
 
 /* ==========================================================================
    Terrain Tactique Visuel Complet (Espacement aéré style Flashscore)
@@ -255,7 +277,7 @@ function DualFacingPitch({
           </div>
           {/* Lignes de champ */}
           {homeRows.map((row, rIdx) => {
-            const isLastRow = rIdx === homeRows.length - 1; // Attaquants
+            const isLastRow = rIdx === homeRows.length - 1;
             return (
               <div
                 key={`home-row-${rIdx}`}
@@ -277,7 +299,7 @@ function DualFacingPitch({
           </div>
           {/* Lignes de champ */}
           {awayRows.map((row, rIdx) => {
-            const isLastRow = rIdx === awayRows.length - 1; // Attaquants
+            const isLastRow = rIdx === awayRows.length - 1;
             return (
               <div
                 key={`away-row-${rIdx}`}
@@ -294,26 +316,14 @@ function DualFacingPitch({
     </div>
   );
 }
-type H2HMatch = {
-  id: number;
-  matchDate: string;
-  homeTeamName: string;
-  awayTeamName: string;
-  homeScore: number;
-  awayScore: number;
-};
 
 export default function MatchCentre({
   matchId,
   initialData,
   h2h = [],
   h2hSummary = { homeWins: 0, awayWins: 0, draws: 0 },
-}: {
-  matchId: number;
-  initialData: LiveData;
-  h2h?: H2HMatch[];
-  h2hSummary?: { homeWins: number; awayWins: number; draws: number };
-}) {
+  h2hAdvanced,
+}: MatchCentreProps) {
   const data = useRealtime<LiveData>(`/api/matches/${matchId}/live`, initialData, `match-${matchId}`);
   const searchParams = useSearchParams();
   const initialTab = TAB_PARAM[searchParams.get("tab") ?? ""] ?? "Scores";
