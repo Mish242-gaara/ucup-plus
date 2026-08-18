@@ -45,17 +45,17 @@ export default async function MatchesPage() {
   }
 
   return (
-    <div>
-      <div className="flex items-center gap-3">
-        <h1 className="text-2xl font-extrabold text-white">Matchs</h1>
-        <Link href="/bracket" className="ml-auto text-sm font-semibold text-brand-500 hover:underline">
+    <div className="w-full max-w-5xl mx-auto px-2 sm:px-0 overflow-x-hidden">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h1 className="text-xl sm:text-2xl font-extrabold text-white">Matchs</h1>
+        <Link href="/bracket" className="text-sm font-semibold text-brand-500 hover:underline">
           Voir le bracket →
         </Link>
       </div>
 
       {/* Formulaire de création de match */}
-      <form action={createMatch} className="mt-6 grid max-w-2xl grid-cols-2 gap-3">
-        <select name="homeTeamId" required className="input">
+      <form action={createMatch} className="mt-6 grid max-w-2xl grid-cols-1 sm:grid-cols-2 gap-3">
+        <select name="homeTeamId" required className="input w-full">
           <option value="">Équipe domicile…</option>
           {teams.map((t) => (
             <option key={t.id} value={t.id}>
@@ -64,7 +64,7 @@ export default async function MatchesPage() {
           ))}
         </select>
 
-        <select name="awayTeamId" required className="input">
+        <select name="awayTeamId" required className="input w-full">
           <option value="">Équipe visiteuse…</option>
           {teams.map((t) => (
             <option key={t.id} value={t.id}>
@@ -73,39 +73,39 @@ export default async function MatchesPage() {
           ))}
         </select>
 
-        <input name="matchDate" type="datetime-local" required className="input col-span-2" />
-        <input name="venue" placeholder="Lieu" className="input" />
-        <input name="group" placeholder="Groupe (A, B…)" className="input" />
-        <input name="round" placeholder="Phase (Quart, Demi, Finale…)" className="input" />
+        <input name="matchDate" type="datetime-local" required className="input col-span-1 sm:col-span-2 w-full" />
+        <input name="venue" placeholder="Lieu" className="input w-full" />
+        <input name="group" placeholder="Groupe (A, B…)" className="input w-full" />
+        <input name="round" placeholder="Phase (Quart, Demi, Finale…)" className="input w-full" />
         
-        <select name="matchType" className="input" defaultValue="tournament">
+        <select name="matchType" className="input w-full" defaultValue="tournament">
           <option value="tournament">Tournoi</option>
           <option value="friendly">Amical</option>
         </select>
 
-        <div className="col-span-2 rounded-md border border-dashed border-white/10 p-3">
-          <p className="text-xs font-semibold text-gray-500">
+        <div className="col-span-1 sm:col-span-2 rounded-md border border-dashed border-white/10 p-3">
+          <p className="text-xs font-semibold text-gray-400">
             Position dans le bracket à élimination directe (optionnel — laisser vide pour un match de poule)
           </p>
-          <div className="mt-2 grid grid-cols-2 gap-3">
+          <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
             <input
               name="bracketRound"
               type="number"
               min={1}
               placeholder="N° de tour (1=1er tour, 2=suivant…)"
-              className="input"
+              className="input w-full"
             />
             <input
               name="bracketPosition"
               type="number"
               min={0}
               placeholder="Position dans le tour (0, 1, 2…)"
-              className="input"
+              className="input w-full"
             />
           </div>
         </div>
 
-        <button type="submit" className="btn col-span-2">
+        <button type="submit" className="btn col-span-1 sm:col-span-2 w-full">
           Créer le match
         </button>
       </form>
@@ -113,20 +113,20 @@ export default async function MatchesPage() {
       {/* Liste des matchs */}
       <div className="mt-8 space-y-3">
         {matches.map((m) => (
-          <div key={m.id} className="admin-card p-4">
-            <div className="flex items-center justify-between">
+          <div key={m.id} className="admin-card p-4 rounded-xl bg-zinc-900 border border-zinc-800">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/5 pb-3">
               <div>
-                <p className="font-medium">
-                  {m.homeTeam.name} {m.homeScore} - {m.awayScore} {m.awayTeam.name}
+                <p className="font-semibold text-white text-sm sm:text-base">
+                  {m.homeTeam.name} <span className="text-brand-400 font-bold">{m.homeScore}</span> - <span className="text-brand-400 font-bold">{m.awayScore}</span> {m.awayTeam.name}
                 </p>
-                <p className="text-xs text-gray-400">
+                <p className="text-xs text-gray-400 mt-1">
                   {new Date(m.matchDate).toLocaleString("fr-FR")} · {m.venue ?? "lieu à définir"} ·{" "}
                   groupe {m.group ?? "-"}
                 </p>
               </div>
 
-              <div className="flex items-center gap-3">
-                <span className="rounded-full bg-zinc-800 px-3 py-1 text-xs uppercase tracking-wide text-gray-300">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                <span className="rounded-full bg-zinc-800 px-2.5 py-1 text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-gray-300">
                   {STATUS_LABELS[m.status] ?? m.status}
                 </span>
                 <Link href={`/admin/matches/${m.id}/edit`} className="text-xs text-brand-500 hover:underline">
@@ -141,34 +141,34 @@ export default async function MatchesPage() {
               </div>
             </div>
 
-            <div className="mt-3 flex flex-wrap items-center gap-3 text-sm">
+            <div className="mt-3 flex flex-wrap items-center gap-3 text-xs sm:text-sm">
               {/* Formulaire Score */}
-              <form action={handleUpdateScore.bind(null, m.id)} className="flex items-center gap-2">
-                <input name="home" type="number" defaultValue={m.homeScore} className="input w-14" />
-                <span>-</span>
-                <input name="away" type="number" defaultValue={m.awayScore} className="input w-14" />
-                <button type="submit" className="text-xs text-brand-500 hover:underline">
-                  Mettre à jour le score
+              <form action={handleUpdateScore.bind(null, m.id)} className="flex items-center gap-1.5 bg-zinc-950 p-1.5 rounded-lg border border-zinc-800">
+                <input name="home" type="number" defaultValue={m.homeScore} className="input w-12 text-center text-xs py-1 px-1" />
+                <span className="text-gray-500">-</span>
+                <input name="away" type="number" defaultValue={m.awayScore} className="input w-12 text-center text-xs py-1 px-1" />
+                <button type="submit" className="text-xs text-brand-500 hover:underline px-1 font-medium">
+                  Mettre à jour
                 </button>
               </form>
 
               {/* Formulaire Statut */}
-              <form action={handleUpdateStatus.bind(null, m.id)} className="flex items-center gap-2">
-                <select name="status" defaultValue={m.status} className="input">
+              <form action={handleUpdateStatus.bind(null, m.id)} className="flex items-center gap-1.5 bg-zinc-950 p-1.5 rounded-lg border border-zinc-800">
+                <select name="status" defaultValue={m.status} className="input text-xs py-1 px-2">
                   {STATUSES.map((s) => (
                     <option key={s} value={s}>
                       {STATUS_LABELS[s]}
                     </option>
                   ))}
                 </select>
-                <button type="submit" className="text-xs text-brand-500 hover:underline">
-                  Changer statut
+                <button type="submit" className="text-xs text-brand-500 hover:underline px-1 font-medium">
+                  Changer
                 </button>
               </form>
 
               {/* Action Dupliquer */}
               <form action={duplicateMatch.bind(null, m.id)}>
-                <button className="text-xs text-gray-500 hover:underline" type="submit">
+                <button className="text-xs text-gray-400 hover:text-white hover:underline py-1" type="submit">
                   Dupliquer
                 </button>
               </form>
@@ -177,7 +177,7 @@ export default async function MatchesPage() {
               <form action={deleteMatch.bind(null, m.id)}>
                 <ConfirmButton
                   message={`Supprimer ce match (${m.homeTeam.name} vs ${m.awayTeam.name}) ? Ses événements et compositions seront aussi supprimés.`}
-                  className="text-xs text-brand-600 hover:underline"
+                  className="text-xs text-rose-500 hover:underline py-1"
                 >
                   Supprimer
                 </ConfirmButton>

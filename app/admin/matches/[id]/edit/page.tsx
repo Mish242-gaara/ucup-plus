@@ -32,7 +32,7 @@ export default async function EditMatchPage({ params }: { params: Promise<{ id: 
     .slice(0, 16);
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-8">
+    <div className="w-full max-w-4xl mx-auto px-3 sm:px-4 py-4 sm:py-8 overflow-x-hidden">
       {/* Navigation & Titre */}
       <div className="mb-6">
         <Link
@@ -41,7 +41,7 @@ export default async function EditMatchPage({ params }: { params: Promise<{ id: 
         >
           ← Retour à la gestion des matchs
         </Link>
-        <h1 className="mt-2 text-2xl font-black tracking-tight text-white sm:text-3xl">
+        <h1 className="mt-2 text-xl sm:text-3xl font-black tracking-tight text-white">
           Modifier le match #{match.id}
         </h1>
       </div>
@@ -49,7 +49,7 @@ export default async function EditMatchPage({ params }: { params: Promise<{ id: 
       {/* Formulaire de modification */}
       <form
         action={updateWithId}
-        className="rounded-xl border border-white/10 bg-zinc-900 p-6 shadow-xl space-y-6"
+        className="rounded-xl border border-white/10 bg-zinc-900 p-4 sm:p-6 shadow-xl space-y-6"
       >
         {/* Section 1 : Équipes */}
         <div className="space-y-3">
@@ -65,7 +65,7 @@ export default async function EditMatchPage({ params }: { params: Promise<{ id: 
                 name="homeTeamId"
                 required
                 defaultValue={match.homeTeamId}
-                className="input w-full rounded-lg border border-white/10 bg-zinc-800 px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-brand-500"
+                className="input w-full rounded-lg border border-white/10 bg-zinc-800 px-3 py-2 text-xs sm:text-sm text-white focus:outline-none focus:ring-1 focus:ring-brand-500"
               >
                 {teams.map((t) => (
                   <option key={t.id} value={t.id}>
@@ -83,7 +83,7 @@ export default async function EditMatchPage({ params }: { params: Promise<{ id: 
                 name="awayTeamId"
                 required
                 defaultValue={match.awayTeamId}
-                className="input w-full rounded-lg border border-white/10 bg-zinc-800 px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-brand-500"
+                className="input w-full rounded-lg border border-white/10 bg-zinc-800 px-3 py-2 text-xs sm:text-sm text-white focus:outline-none focus:ring-1 focus:ring-brand-500"
               >
                 {teams.map((t) => (
                   <option key={t.id} value={t.id}>
@@ -112,7 +112,7 @@ export default async function EditMatchPage({ params }: { params: Promise<{ id: 
                 type="datetime-local"
                 defaultValue={localIsoDate}
                 required
-                className="input w-full rounded-lg border border-white/10 bg-zinc-800 px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-brand-500"
+                className="input w-full rounded-lg border border-white/10 bg-zinc-800 px-3 py-2 text-xs sm:text-sm text-white focus:outline-none focus:ring-1 focus:ring-brand-500"
               />
             </div>
 
@@ -123,7 +123,7 @@ export default async function EditMatchPage({ params }: { params: Promise<{ id: 
               <select
                 name="matchType"
                 defaultValue={match.matchType ?? "tournament"}
-                className="input w-full rounded-lg border border-white/10 bg-zinc-800 px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-brand-500"
+                className="input w-full rounded-lg border border-white/10 bg-zinc-800 px-3 py-2 text-xs sm:text-sm text-white focus:outline-none focus:ring-1 focus:ring-brand-500"
               >
                 <option value="tournament">Tournoi Officiel</option>
                 <option value="friendly">Match Amical</option>
@@ -138,7 +138,7 @@ export default async function EditMatchPage({ params }: { params: Promise<{ id: 
                 name="venue"
                 defaultValue={match.venue ?? ""}
                 placeholder="Ex: Terrain Annexe ESTAM"
-                className="input w-full rounded-lg border border-white/10 bg-zinc-800 px-3 py-2 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                className="input w-full rounded-lg border border-white/10 bg-zinc-800 px-3 py-2 text-xs sm:text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-brand-500"
               />
             </div>
           </div>
@@ -160,7 +160,7 @@ export default async function EditMatchPage({ params }: { params: Promise<{ id: 
                 name="group"
                 defaultValue={match.group ?? ""}
                 placeholder="Ex: Groupe A"
-                className="input w-full rounded-lg border border-white/10 bg-zinc-800 px-3 py-2 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                className="input w-full rounded-lg border border-white/10 bg-zinc-800 px-3 py-2 text-xs sm:text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-brand-500"
               />
             </div>
 
@@ -172,20 +172,20 @@ export default async function EditMatchPage({ params }: { params: Promise<{ id: 
                 name="round"
                 defaultValue={match.round ?? ""}
                 placeholder="Ex: Phase de poules, Quart de finale..."
-                className="input w-full rounded-lg border border-white/10 bg-zinc-800 px-3 py-2 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                className="input w-full rounded-lg border border-white/10 bg-zinc-800 px-3 py-2 text-xs sm:text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-brand-500"
               />
             </div>
           </div>
 
           {/* Configuration du Bracket */}
-          <div className="mt-4 rounded-xl border border-dashed border-white/15 bg-zinc-950/50 p-4">
+          <div className="mt-4 rounded-xl border border-dashed border-white/15 bg-zinc-950/50 p-3 sm:p-4">
             <p className="text-xs font-semibold text-gray-400">
               Arbre à élimination directe (Bracket)
             </p>
             <p className="mt-0.5 text-[11px] text-gray-500">
               Laissez vide s'il s'agit d'un match de phase de groupe.
             </p>
-            <div className="mt-3 grid grid-cols-2 gap-3">
+            <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="mb-1 block text-[11px] text-gray-400">N° de Tour</label>
                 <input
@@ -214,16 +214,16 @@ export default async function EditMatchPage({ params }: { params: Promise<{ id: 
         </div>
 
         {/* Boutons de validation */}
-        <div className="flex items-center justify-end gap-3 pt-4">
+        <div className="flex flex-col-reverse sm:flex-row items-center justify-end gap-3 pt-4">
           <Link
             href="/admin/matches"
-            className="rounded-lg border border-white/10 bg-zinc-800 px-4 py-2.5 text-xs font-semibold text-gray-300 hover:bg-zinc-700 transition-colors"
+            className="w-full sm:w-auto text-center rounded-lg border border-white/10 bg-zinc-800 px-4 py-2.5 text-xs font-semibold text-gray-300 hover:bg-zinc-700 transition-colors"
           >
             Annuler
           </Link>
           <button
             type="submit"
-            className="btn rounded-lg bg-brand-600 px-6 py-2.5 text-xs font-extrabold uppercase tracking-wider text-white shadow-lg hover:bg-brand-500 active:scale-[0.99] transition-all"
+            className="btn w-full sm:w-auto rounded-lg bg-brand-600 px-6 py-2.5 text-xs font-extrabold uppercase tracking-wider text-white shadow-lg hover:bg-brand-500 active:scale-[0.99] transition-all"
           >
             Mettre à jour le match
           </button>

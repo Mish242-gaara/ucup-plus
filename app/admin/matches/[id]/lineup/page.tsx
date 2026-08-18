@@ -83,11 +83,11 @@ function TeamLineupForm({
   const subsCount = Array.from(existing.values()).filter((e) => e.role === "substitute").length;
 
   return (
-    <div className="rounded-xl border border-white/10 bg-zinc-900 p-5 shadow-xl">
+    <div className="rounded-xl border border-white/10 bg-zinc-900 p-3 sm:p-5 shadow-xl w-full">
       {/* Header Équipe & Choix de la Formation */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-4">
         <div>
-          <h2 className="text-lg font-black tracking-tight text-white">{teamName}</h2>
+          <h2 className="text-base sm:text-lg font-black tracking-tight text-white truncate">{teamName}</h2>
           <div className="mt-1 flex items-center gap-2 text-xs font-medium text-gray-400">
             <span className="rounded bg-emerald-500/10 px-2 py-0.5 text-emerald-400 border border-emerald-500/20">
               {startersCount} Titulaires
@@ -98,14 +98,14 @@ function TeamLineupForm({
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center justify-between sm:justify-end gap-2 flex-wrap">
           {/* Formulaire Formation */}
-          <form action={handleSetFormation} className="flex items-center gap-2">
+          <form action={handleSetFormation} className="flex items-center gap-1.5">
             <span className="text-xs text-gray-400">Schéma :</span>
             <select
               name="formation"
               defaultValue={formation ?? "4-4-2"}
-              className="input rounded-lg border border-white/10 bg-zinc-800 px-2.5 py-1 text-xs font-mono font-bold text-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-500"
+              className="input rounded-lg border border-white/10 bg-zinc-800 px-2 py-1 text-xs font-mono font-bold text-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-500"
             >
               {FORMATIONS.map((f) => (
                 <option key={f} value={f}>
@@ -115,7 +115,7 @@ function TeamLineupForm({
             </select>
             <button
               type="submit"
-              className="rounded bg-zinc-800 px-2.5 py-1 text-xs font-semibold text-gray-200 transition-colors hover:bg-zinc-700"
+              className="rounded bg-zinc-800 px-2.5 py-1 text-xs font-semibold text-gray-200 transition-colors hover:bg-zinc-700 active:bg-zinc-600"
             >
               OK
             </button>
@@ -125,7 +125,7 @@ function TeamLineupForm({
           <form action={resetLineup.bind(null, matchId, teamId)}>
             <ConfirmButton
               message={`Réinitialiser totalement la composition de ${teamName} ?`}
-              className="text-xs font-semibold text-rose-500 hover:text-rose-400 hover:underline"
+              className="text-xs font-semibold text-rose-500 hover:text-rose-400 hover:underline px-1 py-1"
             >
               Effacer
             </ConfirmButton>
@@ -135,14 +135,14 @@ function TeamLineupForm({
 
       {/* Formulaire Principal de la Feuille de Match */}
       <form action={submitLineup} className="mt-4">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
+        <div className="overflow-x-auto -mx-1 sm:mx-0">
+          <table className="w-full text-left text-xs sm:text-sm min-w-[340px]">
             <thead className="border-b border-white/10 text-[10px] font-bold uppercase tracking-wider text-gray-400">
               <tr>
-                <th className="pb-3 font-semibold">Joueur</th>
-                <th className="pb-3 font-semibold">Rôle</th>
-                <th className="pb-3 font-semibold">Poste</th>
-                <th className="pb-3 font-semibold text-center">Ordre</th>
+                <th className="pb-2 sm:pb-3 font-semibold">Joueur</th>
+                <th className="pb-2 sm:pb-3 font-semibold">Rôle</th>
+                <th className="pb-2 sm:pb-3 font-semibold">Poste</th>
+                <th className="pb-2 sm:pb-3 font-semibold text-center">Ordre</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
@@ -152,18 +152,20 @@ function TeamLineupForm({
 
                 return (
                   <tr key={p.id} className="transition-colors hover:bg-white/[0.02]">
-                    <td className="py-2.5 font-medium text-gray-200">
-                      <span className="inline-block w-8 font-mono text-xs font-bold text-brand-400">
+                    <td className="py-2 pr-1 font-medium text-gray-200">
+                      <span className="inline-block w-6 sm:w-8 font-mono text-[11px] sm:text-xs font-bold text-brand-400">
                         #{p.jerseyNumber ?? "-"}
                       </span>
-                      {p.firstName} {p.lastName}
+                      <span className="truncate inline-block max-w-[110px] sm:max-w-none align-bottom">
+                        {p.firstName} {p.lastName}
+                      </span>
                     </td>
 
-                    <td className="py-2.5">
+                    <td className="py-2 px-1">
                       <select
                         name={`role-${p.id}`}
                         defaultValue={roleValue}
-                        className={`input rounded border px-2 py-1 text-xs font-semibold focus:outline-none ${
+                        className={`input rounded border px-1.5 py-1 text-[11px] sm:text-xs font-semibold focus:outline-none ${
                           roleValue === "starter"
                             ? "border-emerald-500/30 bg-emerald-950/40 text-emerald-400"
                             : roleValue === "substitute"
@@ -171,22 +173,22 @@ function TeamLineupForm({
                             : "border-white/10 bg-zinc-800 text-gray-400"
                         }`}
                       >
-                        <option value="none">— Hors feuille</option>
+                        <option value="none">— Hors</option>
                         <option value="starter">Titulaire</option>
                         <option value="substitute">Remplaçant</option>
                       </select>
                     </td>
 
-                    <td className="py-2.5">
+                    <td className="py-2 px-1">
                       <input
                         name={`position-${p.id}`}
                         defaultValue={current?.position ?? p.position ?? ""}
-                        placeholder="ex: G, DC, BU"
-                        className="input w-20 rounded border border-white/10 bg-zinc-800 px-2 py-1 font-mono text-xs uppercase text-white placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                        placeholder="ex: G"
+                        className="input w-14 sm:w-20 rounded border border-white/10 bg-zinc-800 px-1.5 py-1 font-mono text-[11px] sm:text-xs uppercase text-white placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-brand-500"
                       />
                     </td>
 
-                    <td className="py-2.5 text-center">
+                    <td className="py-2 pl-1 text-center">
                       <input
                         name={`order-${p.id}`}
                         type="number"
@@ -194,7 +196,7 @@ function TeamLineupForm({
                         max={99}
                         defaultValue={current?.orderKey ?? ""}
                         placeholder="N°"
-                        className="input w-14 rounded border border-white/10 bg-zinc-800 px-2 py-1 text-center font-mono text-xs text-white placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                        className="input w-12 sm:w-14 rounded border border-white/10 bg-zinc-800 px-1 py-1 text-center font-mono text-[11px] sm:text-xs text-white placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-brand-500"
                       />
                     </td>
                   </tr>
@@ -206,7 +208,7 @@ function TeamLineupForm({
 
         <button
           type="submit"
-          className="btn mt-6 w-full rounded-lg bg-brand-600 py-3 text-xs font-extrabold uppercase tracking-wider text-white shadow-lg transition-all hover:bg-brand-500 active:scale-[0.99]"
+          className="btn mt-5 sm:mt-6 w-full rounded-lg bg-brand-600 py-2.5 sm:py-3 text-xs font-extrabold uppercase tracking-wider text-white shadow-lg transition-all hover:bg-brand-500 active:scale-[0.99]"
         >
           Enregistrer la composition ({teamName})
         </button>
@@ -263,24 +265,24 @@ export default async function LineupPage({ params }: { params: Promise<{ id: str
   );
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6 px-4 py-8">
+    <div className="w-full max-w-7xl mx-auto space-y-6 px-2 sm:px-4 py-4 sm:py-8 overflow-x-hidden">
       {/* En-tête de la page */}
-      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-4 sm:pb-6">
         <div>
-          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-brand-400">
+          <div className="flex items-center gap-2 text-[10px] sm:text-xs font-bold uppercase tracking-wider text-brand-400">
             <span>SofaScore Match Console</span>
             <span>•</span>
             <span>Feuilles de Match</span>
           </div>
-          <h1 className="mt-1 text-2xl font-black tracking-tight text-white sm:text-3xl">
+          <h1 className="mt-1 text-xl font-black tracking-tight text-white sm:text-3xl">
             {match.homeTeam.name} <span className="text-zinc-600">vs</span> {match.awayTeam.name}
           </h1>
         </div>
 
         {/* Badges d'état de la composition publique */}
-        <div className="flex flex-wrap items-center gap-3 text-xs font-semibold">
-          <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-zinc-900 px-3 py-1.5 shadow">
-            <span className="text-gray-400">{match.homeTeam.name} :</span>
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs font-semibold">
+          <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-zinc-900 px-2.5 py-1.5 shadow">
+            <span className="text-gray-400 truncate max-w-[100px] sm:max-w-none">{match.homeTeam.name} :</span>
             {match.homeCompositionReady ? (
               <span className="flex items-center gap-1 text-emerald-400">
                 <span className="h-2 w-2 rounded-full bg-emerald-400" /> Publiée
@@ -292,8 +294,8 @@ export default async function LineupPage({ params }: { params: Promise<{ id: str
             )}
           </div>
 
-          <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-zinc-900 px-3 py-1.5 shadow">
-            <span className="text-gray-400">{match.awayTeam.name} :</span>
+          <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-zinc-900 px-2.5 py-1.5 shadow">
+            <span className="text-gray-400 truncate max-w-[100px] sm:max-w-none">{match.awayTeam.name} :</span>
             {match.awayCompositionReady ? (
               <span className="flex items-center gap-1 text-emerald-400">
                 <span className="h-2 w-2 rounded-full bg-emerald-400" /> Publiée
@@ -308,7 +310,7 @@ export default async function LineupPage({ params }: { params: Promise<{ id: str
       </div>
 
       {/* Grille des Formulaires Domicile & Extérieur */}
-      <div className="grid gap-8 lg:grid-cols-2">
+      <div className="grid gap-6 lg:grid-cols-2">
         <TeamLineupForm
           matchId={matchId}
           teamId={match.homeTeamId}

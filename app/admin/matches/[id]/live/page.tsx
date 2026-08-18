@@ -80,12 +80,12 @@ export default async function AdminLiveMatchPage({ params }: { params: Promise<{
   }
 
   return (
-    <div className="space-y-6">
+    <div className="w-full max-w-5xl mx-auto space-y-6 px-2 sm:px-0 overflow-x-hidden">
       {/* --- Dashboard Header (Flashscore / Sofascore Style) --- */}
-      <div className="rounded-xl border border-white/10 bg-zinc-900/90 p-5 shadow-2xl backdrop-blur-md">
-        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-4">
-          <div className="flex items-center gap-3">
-            <span className="flex h-3 w-3 relative">
+      <div className="rounded-xl border border-white/10 bg-zinc-900/90 p-4 sm:p-5 shadow-2xl backdrop-blur-md">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-4">
+          <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+            <span className="flex h-3 w-3 relative shrink-0">
               {match.status === "live" && (
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
               )}
@@ -115,73 +115,73 @@ export default async function AdminLiveMatchPage({ params }: { params: Promise<{
         </div>
 
         {/* Score Board */}
-        <div className="mt-4 flex items-center justify-between text-center">
+        <div className="mt-4 flex items-center justify-between gap-2 text-center">
           <div className="flex-1 text-right">
-            <h2 className="text-lg font-bold text-white sm:text-2xl">{match.homeTeam.name}</h2>
+            <h2 className="text-sm font-bold text-white sm:text-2xl truncate">{match.homeTeam.name}</h2>
           </div>
-          <div className="mx-6 rounded-lg bg-zinc-950 px-5 py-2 font-mono text-3xl font-black text-white shadow-inner sm:text-4xl">
+          <div className="shrink-0 rounded-lg bg-zinc-950 px-3 py-1.5 sm:px-5 sm:py-2 font-mono text-2xl font-black text-white shadow-inner sm:text-4xl">
             {match.homeScore} - {match.awayScore}
           </div>
           <div className="flex-1 text-left">
-            <h2 className="text-lg font-bold text-white sm:text-2xl">{match.awayTeam.name}</h2>
+            <h2 className="text-sm font-bold text-white sm:text-2xl truncate">{match.awayTeam.name}</h2>
           </div>
         </div>
       </div>
 
       {/* --- Timer Controls --- */}
-      <section className="rounded-xl border border-white/10 bg-zinc-900 p-5 shadow-lg">
+      <section className="rounded-xl border border-white/10 bg-zinc-900 p-4 sm:p-5 shadow-lg">
         <h2 className="text-xs font-bold uppercase tracking-widest text-zinc-400">Contrôle du Minuteur</h2>
         <div className="mt-3 flex flex-wrap gap-2">
-          <form action={startTimer.bind(null, matchId)}>
-            <button className="rounded-md bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-500" type="submit">
+          <form action={startTimer.bind(null, matchId)} className="flex-1 sm:flex-none">
+            <button className="w-full rounded-md bg-emerald-600 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-500" type="submit">
               ▶ Démarrer
             </button>
           </form>
-          <form action={pauseTimer.bind(null, matchId)}>
-            <button className="rounded-md bg-amber-600 px-4 py-2 text-xs font-bold text-white hover:bg-amber-500" type="submit">
+          <form action={pauseTimer.bind(null, matchId)} className="flex-1 sm:flex-none">
+            <button className="w-full rounded-md bg-amber-600 px-3 py-2 text-xs font-bold text-white hover:bg-amber-500" type="submit">
               ⏸ Pause
             </button>
           </form>
-          <form action={setHalftime.bind(null, matchId)}>
-            <button className="rounded-md bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-500" type="submit">
+          <form action={setHalftime.bind(null, matchId)} className="flex-1 sm:flex-none">
+            <button className="w-full rounded-md bg-blue-600 px-3 py-2 text-xs font-bold text-white hover:bg-blue-500" type="submit">
               ☕ Mi-Temps
             </button>
           </form>
-          <form action={resumeTimer.bind(null, matchId)}>
-            <button className="rounded-md bg-indigo-600 px-4 py-2 text-xs font-bold text-white hover:bg-indigo-500" type="submit">
+          <form action={resumeTimer.bind(null, matchId)} className="flex-1 sm:flex-none">
+            <button className="w-full rounded-md bg-indigo-600 px-3 py-2 text-xs font-bold text-white hover:bg-indigo-500" type="submit">
               🔄 Reprendre
             </button>
           </form>
-          <form action={stopTimer.bind(null, matchId)}>
-            <button className="rounded-md bg-rose-600 px-4 py-2 text-xs font-bold text-white hover:bg-rose-500" type="submit">
+          <form action={stopTimer.bind(null, matchId)} className="flex-1 sm:flex-none">
+            <button className="w-full rounded-md bg-rose-600 px-3 py-2 text-xs font-bold text-white hover:bg-rose-500" type="submit">
               ⏹ Fin de Match
             </button>
           </form>
         </div>
 
-        <div className="mt-5 grid grid-cols-1 gap-4 border-t border-white/5 pt-4 sm:grid-cols-2 lg:grid-cols-4 text-xs">
+        <div className="mt-5 grid grid-cols-1 gap-3 border-t border-white/5 pt-4 sm:grid-cols-2 lg:grid-cols-4 text-xs">
           <form action={handleAddFirstHalfTime} className="flex items-center gap-2">
-            <input name="minutes" type="number" defaultValue={1} className="input w-16 text-center" />
+            <input name="minutes" type="number" defaultValue={1} className="input w-16 text-center py-1" />
             <button className="font-semibold text-brand-400 hover:underline" type="submit">
               + Add. MT1
             </button>
           </form>
 
           <form action={handleAddSecondHalfTime} className="flex items-center gap-2">
-            <input name="minutes" type="number" defaultValue={1} className="input w-16 text-center" />
+            <input name="minutes" type="number" defaultValue={1} className="input w-16 text-center py-1" />
             <button className="font-semibold text-brand-400 hover:underline" type="submit">
               + Add. MT2
             </button>
           </form>
 
           <form action={setExtraTime.bind(null, matchId, !match.isExtraTime)} className="flex items-center">
-            <button className="font-semibold text-indigo-400 hover:underline" type="submit">
+            <button className="font-semibold text-indigo-400 hover:underline py-1" type="submit">
               {match.isExtraTime ? "❌ Annuler Prolongations" : "⏱️ Activer Prolongations"}
             </button>
           </form>
 
           <form action={setPenaltyShootout.bind(null, matchId, !match.isPenaltyShootout)} className="flex items-center">
-            <button className="font-semibold text-amber-400 hover:underline" type="submit">
+            <button className="font-semibold text-amber-400 hover:underline py-1" type="submit">
               {match.isPenaltyShootout ? "❌ Annuler TAB" : "🎯 Activer Tirs au But"}
             </button>
           </form>
@@ -189,12 +189,12 @@ export default async function AdminLiveMatchPage({ params }: { params: Promise<{
       </section>
 
       {/* --- Quick-action Stats --- */}
-      <section className="rounded-xl border border-white/10 bg-zinc-900 p-5 shadow-lg">
+      <section className="rounded-xl border border-white/10 bg-zinc-900 p-4 sm:p-5 shadow-lg">
         <h2 className="text-xs font-bold uppercase tracking-widest text-brand-400">Saisie Rapide des Stats Live</h2>
         <p className="mt-1 text-xs text-gray-400">
           Chaque incrémentation met à jour instantanément la vue publique SofaScore.
         </p>
-        <div className="mt-4">
+        <div className="mt-4 overflow-x-auto">
           <QuickStatButtons
             matchId={matchId}
             homeTeamName={match.homeTeam.name}
@@ -217,17 +217,17 @@ export default async function AdminLiveMatchPage({ params }: { params: Promise<{
       </section>
 
       {/* --- Add Event Form --- */}
-      <section className="rounded-xl border border-white/10 bg-zinc-900 p-5 shadow-lg">
+      <section className="rounded-xl border border-white/10 bg-zinc-900 p-4 sm:p-5 shadow-lg">
         <h2 className="text-xs font-bold uppercase tracking-widest text-zinc-400">Enregistrer un Événement</h2>
-        <form action={addEvent} className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <form action={addEvent} className="mt-3 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
           <input type="hidden" name="matchId" value={matchId} />
 
-          <select name="teamId" required className="input">
+          <select name="teamId" required className="input w-full">
             <option value={match.homeTeamId}>{match.homeTeam.name}</option>
             <option value={match.awayTeamId}>{match.awayTeam.name}</option>
           </select>
 
-          <select name="eventType" required className="input">
+          <select name="eventType" required className="input w-full">
             {EVENT_TYPES.map((t) => (
               <option key={t.value} value={t.value}>
                 {t.label}
@@ -235,7 +235,7 @@ export default async function AdminLiveMatchPage({ params }: { params: Promise<{
             ))}
           </select>
 
-          <select name="playerId" required className="input">
+          <select name="playerId" required className="input w-full">
             <option value="">Joueur principal…</option>
             {allPlayers.map((p) => (
               <option key={p.id} value={p.id}>
@@ -244,9 +244,9 @@ export default async function AdminLiveMatchPage({ params }: { params: Promise<{
             ))}
           </select>
 
-          <input name="minute" type="number" placeholder="Minute (ex: 45)" required className="input" />
+          <input name="minute" type="number" placeholder="Minute (ex: 45)" required className="input w-full" />
 
-          <select name="assistPlayerId" className="input">
+          <select name="assistPlayerId" className="input w-full">
             <option value="">Passeur (Optionnel)</option>
             {allPlayers.map((p) => (
               <option key={p.id} value={p.id}>
@@ -255,7 +255,7 @@ export default async function AdminLiveMatchPage({ params }: { params: Promise<{
             ))}
           </select>
 
-          <select name="outPlayerId" className="input">
+          <select name="outPlayerId" className="input w-full">
             <option value="">Joueur sortant (Optionnel)</option>
             {allPlayers.map((p) => (
               <option key={p.id} value={p.id}>
@@ -264,29 +264,29 @@ export default async function AdminLiveMatchPage({ params }: { params: Promise<{
             ))}
           </select>
 
-          <input name="additionalTime" placeholder="Temps Add. (ex: +3)" className="input" />
-          <input name="description" placeholder="Note ou détails" className="input" />
+          <input name="additionalTime" placeholder="Temps Add. (ex: +3)" className="input w-full" />
+          <input name="description" placeholder="Note ou détails" className="input w-full" />
 
-          <button type="submit" className="btn col-span-2 sm:col-span-4 bg-brand-600 hover:bg-brand-500">
+          <button type="submit" className="btn col-span-1 sm:col-span-2 md:col-span-4 bg-brand-600 hover:bg-brand-500 w-full">
             Valider l&apos;Événement
           </button>
         </form>
       </section>
 
       {/* --- Commentary Form --- */}
-      <section className="rounded-xl border border-white/10 bg-zinc-900 p-5 shadow-lg">
+      <section className="rounded-xl border border-white/10 bg-zinc-900 p-4 sm:p-5 shadow-lg">
         <h2 className="text-xs font-bold uppercase tracking-widest text-brand-400">Commentaire Live / Fil d&apos;Actu</h2>
-        <form action={handleAddCommentary} className="mt-3 grid grid-cols-6 gap-2">
-          <input name="minute" type="number" min={0} placeholder="Min." required className="input col-span-1" />
-          <input name="text" placeholder="Description de l'action, arrêt décisif, ambiance..." required className="input col-span-4" />
-          <button type="submit" className="btn col-span-1 bg-zinc-800 hover:bg-zinc-700">
+        <form action={handleAddCommentary} className="mt-3 flex flex-col sm:flex-row gap-2">
+          <input name="minute" type="number" min={0} placeholder="Min." required className="input w-full sm:w-20 shrink-0" />
+          <input name="text" placeholder="Description de l'action, arrêt décisif, ambiance..." required className="input flex-1 w-full" />
+          <button type="submit" className="btn bg-zinc-800 hover:bg-zinc-700 shrink-0 w-full sm:w-auto">
             Publier
           </button>
         </form>
       </section>
 
       {/* --- Event & Commentary Feed --- */}
-      <section className="rounded-xl border border-white/10 bg-zinc-900 p-5 shadow-lg">
+      <section className="rounded-xl border border-white/10 bg-zinc-900 p-4 sm:p-5 shadow-lg">
         <h2 className="text-xs font-bold uppercase tracking-widest text-zinc-400">Fil Événementiel Chronologique</h2>
         <ul className="mt-4 space-y-2">
           {[
@@ -303,18 +303,18 @@ export default async function AdminLiveMatchPage({ params }: { params: Promise<{
               row.kind === "event" ? (
                 <li
                   key={`e-${row.item.id}`}
-                  className="flex items-center justify-between rounded-lg border border-white/10 bg-zinc-950 px-4 py-3 text-sm"
+                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-lg border border-white/10 bg-zinc-950 px-3 sm:px-4 py-2.5 text-sm"
                 >
-                  <div className="flex items-center gap-3">
-                    <span className="font-mono text-xs font-bold text-brand-400">{row.item.minute}&apos;</span>
+                  <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+                    <span className="font-mono text-xs font-bold text-brand-400 shrink-0">{row.item.minute}&apos;</span>
                     <span className="font-semibold text-white">
                       {EVENT_TYPES.find((t) => t.value === row.item.eventType)?.label ?? row.item.eventType}
                     </span>
-                    <span className="text-gray-300">
+                    <span className="text-gray-300 text-xs sm:text-sm">
                       — {row.item.player.firstName} {row.item.player.lastName} ({row.item.team.name})
                     </span>
                   </div>
-                  <form action={deleteEvent.bind(null, row.item.id)}>
+                  <form action={deleteEvent.bind(null, row.item.id)} className="self-end sm:self-center">
                     <ConfirmButton message="Supprimer cet événement ?" className="text-xs text-rose-500 hover:underline">
                       Supprimer
                     </ConfirmButton>
@@ -323,13 +323,13 @@ export default async function AdminLiveMatchPage({ params }: { params: Promise<{
               ) : (
                 <li
                   key={`c-${row.item.id}`}
-                  className="flex items-center justify-between rounded-lg border border-white/5 bg-zinc-950/50 px-4 py-3 text-sm italic text-gray-400"
+                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-lg border border-white/5 bg-zinc-950/50 px-3 sm:px-4 py-2.5 text-sm italic text-gray-400"
                 >
-                  <div className="flex items-center gap-3">
-                    <span className="font-mono text-xs font-bold text-gray-500">{row.item.minute}&apos;</span>
-                    <span>💬 {row.item.text}</span>
+                  <div className="flex items-center gap-2 sm:gap-3">
+                    <span className="font-mono text-xs font-bold text-gray-500 shrink-0">{row.item.minute}&apos;</span>
+                    <span className="break-words text-xs sm:text-sm">💬 {row.item.text}</span>
                   </div>
-                  <form action={deleteCommentary.bind(null, row.item.id, matchId)}>
+                  <form action={deleteCommentary.bind(null, row.item.id, matchId)} className="self-end sm:self-center">
                     <ConfirmButton message="Supprimer ce commentaire ?" className="not-italic text-xs text-rose-500 hover:underline">
                       Supprimer
                     </ConfirmButton>
