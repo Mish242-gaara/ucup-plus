@@ -179,7 +179,9 @@ model Match {
   matchLineups             MatchLineup[]
   awayTeam                 Team              @relation("AwayTeam", fields: [awayTeamId], references: [id], onDelete: Cascade)
   homeTeam                 Team              @relation("HomeTeam", fields: [homeTeamId], references: [id], onDelete: Cascade)
-
+  homeVotes                Int               @default(0)
+  drawVotes                Int               @default(0)
+  awayVotes                Int               @default(0)
   @@map("matches")
 }
 

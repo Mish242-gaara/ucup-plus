@@ -45,18 +45,20 @@ export default async function HomePage() {
 
   return (
     <div className="space-y-6">
-      {/* 1. Flash Info tout en haut */}
       <FlashInfo />
 
       <main className="mx-auto max-w-6xl px-4 space-y-8 pb-12">
-        {/* 2. Match Vedette / Hero Banner */}
         {nextMatch && (
           <FeaturedMatchHero
+            matchId={nextMatch.id}
             homeTeam={nextMatch.homeTeam.name}
             homeLogo={nextMatch.homeTeam.university.logo}
             awayTeam={nextMatch.awayTeam.name}
             awayLogo={nextMatch.awayTeam.university.logo}
             location={nextMatch.venue}
+            initialHomeVotes={nextMatch.homeVotes ?? 0}
+            initialDrawVotes={nextMatch.drawVotes ?? 0}
+            initialAwayVotes={nextMatch.awayVotes ?? 0}
             matchDate={new Date(nextMatch.matchDate).toLocaleDateString("fr-FR", {
               weekday: "long",
               day: "numeric",
@@ -67,13 +69,10 @@ export default async function HomePage() {
           />
         )}
 
-        {/* 3. Carrousel des Équipes */}
         <TeamsCarousel />
 
-        {/* 4. Grille Principale */}
         <div className="grid gap-6 lg:grid-cols-3">
           <section className="lg:col-span-2 space-y-8">
-            {/* Live Feed */}
             <div>
               <h1 className="text-xl font-extrabold uppercase tracking-wide text-ink mb-3">
                 Live Score Feed
@@ -85,13 +84,9 @@ export default async function HomePage() {
               />
             </div>
 
-            {/* Joueur / MVP à la Une */}
             <MVPWidget />
-
-            {/* Fil d'Actualités */}
             <NewsFeed />
 
-            {/* Stats Globales */}
             <div>
               <h2 className="text-sm font-bold uppercase tracking-wide text-ink mb-3">
                 Chiffres du Tournoi
@@ -100,14 +95,12 @@ export default async function HomePage() {
             </div>
           </section>
 
-          {/* Barre Latérale */}
           <aside className="space-y-6">
             <TopScorersWidget />
             <StandingsWidget />
           </aside>
         </div>
 
-        {/* 5. Partenaires */}
         <SponsorsBanner />
       </main>
     </div>
