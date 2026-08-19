@@ -2,15 +2,16 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
 import PWAInstallPrompt from "@/components/PWAInstallPrompt";
+import SplashScreen from "@/components/SplashScreen";
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 
-// Configuration Viewport pour rendre l'application 100% responsive et optimisée PWA
+// Configuration Viewport optimisée pour la PWA
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
-  themeColor: "#ef4444",
+  themeColor: "#090d16",
 };
 
 export const metadata: Metadata = {
@@ -25,6 +26,11 @@ export const metadata: Metadata = {
     capable: true,
     statusBarStyle: "black-translucent",
     title: "UCUP 2026",
+    startupImage: [
+      {
+        url: "/icons/icon-512x512.png",
+      },
+    ],
   },
   icons: {
     icon: [
@@ -46,6 +52,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="fr" className="dark">
       <body className="antialiased bg-zinc-950 text-white min-h-screen">
+        <SplashScreen />
         <ServiceWorkerRegister />
         <PWAInstallPrompt />
         {children}
