@@ -447,3 +447,15 @@ enum MediaType {
 
   @@map("media_type")
 }
+model PushSubscription {
+  id           String   @id @default(cuid())
+  endpoint     String   @unique
+  p256dh       String
+  auth         String
+  teamId       String?  // ID de l'équipe favorite (optionnel)
+  notifyGoals  Boolean  @default(true)
+  notifyCards  Boolean  @default(true)
+  notifyFinal  Boolean  @default(true)
+  notifyNews   Boolean  @default(true)
+  createdAt    DateTime @default(now())
+}
