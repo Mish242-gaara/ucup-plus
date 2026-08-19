@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
-import ServiceWorkerRegister from "../components/ServiceWorkerRegister";
+import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
+import PWAInstallPrompt from "@/components/PWAInstallPrompt";
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 
@@ -46,6 +47,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="fr" className="dark">
       <body className="antialiased bg-zinc-950 text-white min-h-screen">
         <ServiceWorkerRegister />
+        <PWAInstallPrompt />
         {children}
       </body>
     </html>
