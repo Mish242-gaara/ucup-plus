@@ -4,14 +4,20 @@ import { getElapsedSeconds, formatElapsed } from "@/lib/elapsed-time";
 import MatchCentre from "@/components/MatchCentre";
 import type { Metadata } from "next";
 
-export async function generateMetadata({
-  params,
-}: {
+type Props = {
   params: Promise<{ id: string }>;
-}): Promise<Metadata> {
+};
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
+  const matchId = Number(id);
+
+  if (isNaN(matchId)) {
+    return { title: "Match introuvable — UCUP 2026" };
+  }
+
   const match = await prisma.match.findUnique({
-    where: { id: Number(id) },
+    where: { id: matchId },
     include: { homeTeam: true, awayTeam: true },
   });
 
@@ -44,17 +50,13 @@ function getMatchResultForTeam(
   return "D";
 }
 
-export default async function MatchPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
+export default async function MatchPage({ params }: Props) {
   const { id } = await params;
   const matchId = Number(id);
 
   if (isNaN(matchId)) notFound();
 
-  // 1. Récupération du match principal
+  // 1. Récupération du match principal avec relations
   const match = await prisma.match.findUnique({
     where: { id: matchId },
     include: {
@@ -71,7 +73,7 @@ export default async function MatchPage({
 
   if (!match) notFound();
 
-  // 2. Requêtes H2H et Forme récente
+  // 2. Exécution parallèle des requêtes H2H et Forme récente
   const [h2hMatches, homeRecentMatches, awayRecentMatches] = await Promise.all([
     prisma.match.findMany({
       where: {
@@ -106,7 +108,7 @@ export default async function MatchPage({
     }),
   ]);
 
-  // 3. Forme récente
+  // 3. Calcul de la forme récente
   const homeFormRecent: MatchResult[] = homeRecentMatches
     .map((m) => getMatchResultForTeam(m, match.homeTeamId))
     .filter((res): res is MatchResult => res !== null)
@@ -123,7 +125,7 @@ export default async function MatchPage({
   const homeFormPoints = calculateFormPoints(homeFormRecent);
   const awayFormPoints = calculateFormPoints(awayFormRecent);
 
-  // 4. Bilan H2H
+  // 4. Synthèse H2H
   const h2hSummary = h2hMatches.reduce(
     (acc, m) => {
       const homeIsCurrentHome = m.homeTeamId === match.homeTeamId;
@@ -140,7 +142,7 @@ export default async function MatchPage({
     { homeWins: 0, awayWins: 0, draws: 0 }
   );
 
-  // 5. Probabilités Sofascore (Forme 60% + H2H 40% + Avantage Domicile)
+  // 5. Estimation des probabilités de victoire
   const maxFormPoints = 15;
   const homeFormRating = homeFormPoints / maxFormPoints;
   const awayFormRating = awayFormPoints / maxFormPoints;
@@ -160,7 +162,7 @@ export default async function MatchPage({
   const awayWinProb = Math.round((rawAway / totalRaw) * 100);
   const drawProb = 100 - homeWinProb - awayWinProb;
 
-  // 6. Données sérialisées
+  // 6. Formatage des données pour le client
   const h2h = h2hMatches.slice(0, 5).map((m) => ({
     id: m.id,
     matchDate: m.matchDate.toISOString(),
@@ -196,8 +198,8 @@ export default async function MatchPage({
     playerId: l.playerId,
     playerName: `${l.player.firstName} ${l.player.lastName}`,
     jerseyNumber: l.player.jerseyNumber,
-    position: l.position || l.startingPosition,
-    orderKey: l.orderKey,
+    position: l.position || l.startingPosition || null,
+    orderKey: l.orderKey ?? null,
     role: l.role,
     photoUrl: l.player.photo || l.player.photoPath || null,
   });
@@ -224,20 +226,20 @@ export default async function MatchPage({
       name: match.homeTeam.name,
       logo: match.homeTeam.university?.logo ?? null,
       formation: match.homeFormation ?? "4-3-3",
-      compositionReady: match.homeCompositionReady,
+      compositionReady: match.homeCompositionReady ?? false,
     },
     awayTeam: {
       id: match.awayTeam.id,
       name: match.awayTeam.name,
       logo: match.awayTeam.university?.logo ?? null,
       formation: match.awayFormation ?? "4-3-3",
-      compositionReady: match.awayCompositionReady,
+      compositionReady: match.awayCompositionReady ?? false,
     },
     elapsedSeconds,
     formattedTime: formatElapsed(elapsedSeconds),
     isPaused: Boolean(match.timerPausedAt),
-    additionalTimeFirstHalf: match.additionalTimeFirstHalf,
-    additionalTimeSecondHalf: match.additionalTimeSecondHalf,
+    additionalTimeFirstHalf: match.additionalTimeFirstHalf ?? null,
+    additionalTimeSecondHalf: match.additionalTimeSecondHalf ?? null,
     isExtraTime: Boolean(match.isExtraTime),
     isPenaltyShootout: Boolean(match.isPenaltyShootout),
     stats: {
@@ -259,7 +261,7 @@ export default async function MatchPage({
       id: e.id,
       eventType: e.eventType,
       minute: e.minute,
-      additionalTime: e.additionalTime,
+      additionalTime: e.additionalTime ?? null,
       teamId: e.teamId,
       team: e.team.name,
       player: `${e.player.firstName} ${e.player.lastName}`,

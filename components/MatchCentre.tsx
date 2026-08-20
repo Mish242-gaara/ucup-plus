@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useSearchParams } from "next/navigation";
-import { Trophy, LayoutGrid, List } from "lucide-react";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
+import { Trophy, LayoutGrid, List, MapPin, UserCheck, Flame, Scale } from "lucide-react";
 import { useRealtime } from "@/lib/hooks/useRealtime";
 import TeamLogo from "@/components/TeamLogo";
 
@@ -28,7 +28,7 @@ export type LiveData = {
   awayScore: number;
   homeTeam: { name: string; logo: string | null; formation: string | null; compositionReady: boolean };
   awayTeam: { name: string; logo: string | null; formation: string | null; compositionReady: boolean };
-  formattedTime: string; // Ex: "45:00" ou "12:30"
+  formattedTime: string;
   isPaused: boolean;
   isExtraTime: boolean;
   isPenaltyShootout: boolean;
@@ -97,6 +97,14 @@ const TAB_PARAM: Record<string, (typeof TABS)[number]> = {
   resume: "Résumé",
   h2h: "Face-à-face",
   compositions: "Compositions",
+};
+
+const REVERSE_TAB_PARAM: Record<(typeof TABS)[number], string> = {
+  Scores: "scores",
+  Stats: "stats",
+  Résumé: "resume",
+  "Face-à-face": "h2h",
+  Compositions: "compositions",
 };
 
 const STAT_LABELS: { key: string; label: string; suffix?: string }[] = [
@@ -182,8 +190,8 @@ function StatBar({ label, home, away, suffix = "" }: { label: string; home: numb
         </span>
       </div>
       <div className="mt-1.5 flex h-1.5 overflow-hidden rounded-full bg-white/10">
-        <div className="bg-brand-500" style={{ width: `${homePct}%` }} />
-        <div className="bg-white/40" style={{ width: `${100 - homePct}%` }} />
+        <div className="bg-brand-500 transition-all duration-300" style={{ width: `${homePct}%` }} />
+        <div className="bg-white/40 transition-all duration-300" style={{ width: `${100 - homePct}%` }} />
       </div>
     </div>
   );
@@ -354,14 +362,32 @@ function DualFacingPitch({
   );
 }
 
+function FormBadge({ result }: { result: MatchResult }) {
+  const colors: Record<MatchResult, string> = {
+    V: "bg-emerald-500 text-white",
+    N: "bg-zinc-500 text-white",
+    D: "bg-rose-500 text-white",
+  };
+
+  return (
+    <span className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold ${colors[result]}`}>
+      {result}
+    </span>
+  );
+}
+
 export default function MatchCentre({
   matchId,
   initialData,
   h2h = [],
   h2hSummary = { homeWins: 0, awayWins: 0, draws: 0 },
+  h2hAdvanced,
 }: MatchCentreProps) {
   const data = useRealtime<LiveData>(`/api/matches/${matchId}/live`, initialData, `match-${matchId}`);
   const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+
   const [tab, setTab] = useState<(typeof TABS)[number]>("Scores");
   const [lineupViewMode, setLineupViewMode] = useState<"pitch" | "list">("pitch");
 
@@ -371,6 +397,13 @@ export default function MatchCentre({
       setTab(TAB_PARAM[tabParam]);
     }
   }, [searchParams]);
+
+  const handleTabChange = (selectedTab: (typeof TABS)[number]) => {
+    setTab(selectedTab);
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("tab", REVERSE_TAB_PARAM[selectedTab]);
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  };
 
   const isLive = data.status === "live" || data.status === "halftime";
   const events = data?.events ?? [];
@@ -403,13 +436,28 @@ export default function MatchCentre({
             </p>
           </div>
         </div>
+
+        {(data.venue || data.referee) && (
+          <div className="mt-2 flex items-center justify-center gap-4 text-xs text-brand-100/80">
+            {data.venue && (
+              <span className="flex items-center gap-1">
+                <MapPin size={12} /> {data.venue}
+              </span>
+            )}
+            {data.referee && (
+              <span className="flex items-center gap-1">
+                <UserCheck size={12} /> {data.referee}
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="flex justify-center gap-1 overflow-x-auto border-b border-white/10 bg-zinc-900 px-4">
         {TABS.map((t) => (
           <button
             key={t}
-            onClick={() => setTab(t)}
+            onClick={() => handleTabChange(t)}
             className={
               tab === t
                 ? "border-b-2 border-brand-500 px-4 py-3 text-sm font-bold uppercase tracking-wide text-white whitespace-nowrap"
@@ -536,7 +584,53 @@ export default function MatchCentre({
         )}
 
         {tab === "Face-à-face" && (
-          <div>
+          <div className="space-y-6">
+            {h2hAdvanced && (
+              <div className="rounded-xl border border-white/10 bg-zinc-900/60 p-4 space-y-4">
+                <div className="flex items-center justify-between text-xs text-gray-400">
+                  <span className="flex items-center gap-1.5 font-semibold text-white">
+                    <Flame size={14} className="text-amber-500" /> Forme récente
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-medium text-gray-300">{data.homeTeam.name}</span>
+                    <div className="flex gap-1">
+                      {h2hAdvanced.homeForm.recent.map((r, i) => (
+                        <FormBadge key={i} result={r} />
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-end gap-2">
+                    <div className="flex gap-1">
+                      {h2hAdvanced.awayForm.recent.map((r, i) => (
+                        <FormBadge key={i} result={r} />
+                      ))}
+                    </div>
+                    <span className="text-xs font-medium text-gray-300">{data.awayTeam.name}</span>
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-white/5 space-y-1.5">
+                  <div className="flex items-center justify-between text-xs text-gray-400">
+                    <span className="flex items-center gap-1 font-semibold text-white">
+                      <Scale size={14} className="text-blue-400" /> Probabilité de victoire
+                    </span>
+                  </div>
+                  <div className="flex h-2 overflow-hidden rounded-full bg-zinc-800 text-[10px]">
+                    <div style={{ width: `${h2hAdvanced.probabilities.homeWin}%` }} className="bg-emerald-500" />
+                    <div style={{ width: `${h2hAdvanced.probabilities.draw}%` }} className="bg-zinc-500" />
+                    <div style={{ width: `${h2hAdvanced.probabilities.awayWin}%` }} className="bg-blue-500" />
+                  </div>
+                  <div className="flex justify-between text-[11px] font-medium text-gray-400">
+                    <span>{h2hAdvanced.probabilities.homeWin}%</span>
+                    <span>Nul {h2hAdvanced.probabilities.draw}%</span>
+                    <span>{h2hAdvanced.probabilities.awayWin}%</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {totalH2H === 0 && h2h.length === 0 ? (
               <div className="rounded-xl border border-white/5 bg-zinc-900/50 py-10 text-center">
                 <p className="text-base font-semibold text-white">Premier affrontement direct</p>
