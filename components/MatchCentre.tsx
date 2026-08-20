@@ -109,9 +109,6 @@ const STAT_LABELS: { key: string; label: string; suffix?: string }[] = [
   { key: "saves", label: "Arrêts" },
 ];
 
-/**
- * Composant pour gérer l'affichage et l'incrémentation dynamique du chrono
- */
 function LiveMatchTimer({
   status,
   formattedTime,
@@ -123,12 +120,10 @@ function LiveMatchTimer({
 }) {
   const [time, setTime] = useState(formattedTime);
 
-  // Synchronise le state local à chaque mise à jour venant du WebSocket/serveur
   useEffect(() => {
     setTime(formattedTime);
   }, [formattedTime]);
 
-  // Incrémente le temps localement chaque seconde si le match est en direct et non en pause
   useEffect(() => {
     if (status !== "live" || isPaused) return;
 
@@ -367,10 +362,15 @@ export default function MatchCentre({
 }: MatchCentreProps) {
   const data = useRealtime<LiveData>(`/api/matches/${matchId}/live`, initialData, `match-${matchId}`);
   const searchParams = useSearchParams();
-  const initialTab = TAB_PARAM[searchParams.get("tab") ?? ""] ?? "Scores";
-  const [tab, setTab] = useState<(typeof TABS)[number]>(initialTab);
-
+  const [tab, setTab] = useState<(typeof TABS)[number]>("Scores");
   const [lineupViewMode, setLineupViewMode] = useState<"pitch" | "list">("pitch");
+
+  useEffect(() => {
+    const tabParam = searchParams.get("tab");
+    if (tabParam && TAB_PARAM[tabParam]) {
+      setTab(TAB_PARAM[tabParam]);
+    }
+  }, [searchParams]);
 
   const isLive = data.status === "live" || data.status === "halftime";
   const events = data?.events ?? [];
@@ -426,7 +426,6 @@ export default function MatchCentre({
           <div>
             <div className="flex items-center justify-center gap-2 text-sm font-semibold text-gray-300">
               {isLive && <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />}
-              {/* Composant Chrono dynamique ici */}
               <LiveMatchTimer
                 status={data.status}
                 formattedTime={data.formattedTime}
@@ -494,11 +493,16 @@ export default function MatchCentre({
               <p className="text-sm text-gray-500">Aucun événement pour le moment.</p>
             )}
             {[
-              ...events.map((e) => ({ kind: "event" as const, minute: e.minute, sortKey: e.minute * 10, data: e })),
+              ...events.map((e) => ({
+                kind: "event" as const,
+                minute: e.minute,
+                sortKey: e.minute * 100 + (e.additionalTime ? parseInt(e.additionalTime, 10) : 0),
+                data: e,
+              })),
               ...(data.commentary ?? []).map((c) => ({
                 kind: "comment" as const,
                 minute: c.minute,
-                sortKey: c.minute * 10 + 1,
+                sortKey: c.minute * 100 + 1,
                 data: c,
               })),
             ]

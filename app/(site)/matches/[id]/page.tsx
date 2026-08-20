@@ -71,7 +71,7 @@ export default async function MatchPage({
 
   if (!match) notFound();
 
-  // 2. Requêtes de données pour le H2H et la forme récente des deux équipes
+  // 2. Requêtes H2H et Forme récente
   const [h2hMatches, homeRecentMatches, awayRecentMatches] = await Promise.all([
     prisma.match.findMany({
       where: {
@@ -106,7 +106,7 @@ export default async function MatchPage({
     }),
   ]);
 
-  // 3. Calcul de la forme récente (Series)
+  // 3. Forme récente
   const homeFormRecent: MatchResult[] = homeRecentMatches
     .map((m) => getMatchResultForTeam(m, match.homeTeamId))
     .filter((res): res is MatchResult => res !== null)
@@ -123,7 +123,7 @@ export default async function MatchPage({
   const homeFormPoints = calculateFormPoints(homeFormRecent);
   const awayFormPoints = calculateFormPoints(awayFormRecent);
 
-  // 4. Calcul de l'historique direct (H2H Summary)
+  // 4. Bilan H2H
   const h2hSummary = h2hMatches.reduce(
     (acc, m) => {
       const homeIsCurrentHome = m.homeTeamId === match.homeTeamId;
@@ -140,7 +140,7 @@ export default async function MatchPage({
     { homeWins: 0, awayWins: 0, draws: 0 }
   );
 
-  // 5. Algorithme de probabilités (Forme 60% + H2H 40% + Avantage domicile)
+  // 5. Probabilités Sofascore (Forme 60% + H2H 40% + Avantage Domicile)
   const maxFormPoints = 15;
   const homeFormRating = homeFormPoints / maxFormPoints;
   const awayFormRating = awayFormPoints / maxFormPoints;
@@ -160,7 +160,7 @@ export default async function MatchPage({
   const awayWinProb = Math.round((rawAway / totalRaw) * 100);
   const drawProb = 100 - homeWinProb - awayWinProb;
 
-  // 6. Formatage des données H2H
+  // 6. Données sérialisées
   const h2h = h2hMatches.slice(0, 5).map((m) => ({
     id: m.id,
     matchDate: m.matchDate.toISOString(),
@@ -222,15 +222,15 @@ export default async function MatchPage({
     homeTeam: {
       id: match.homeTeam.id,
       name: match.homeTeam.name,
-      logo: match.homeTeam.university.logo,
-      formation: match.homeFormation,
+      logo: match.homeTeam.university?.logo ?? null,
+      formation: match.homeFormation ?? "4-3-3",
       compositionReady: match.homeCompositionReady,
     },
     awayTeam: {
       id: match.awayTeam.id,
       name: match.awayTeam.name,
-      logo: match.awayTeam.university.logo,
-      formation: match.awayFormation,
+      logo: match.awayTeam.university?.logo ?? null,
+      formation: match.awayFormation ?? "4-3-3",
       compositionReady: match.awayCompositionReady,
     },
     elapsedSeconds,
@@ -241,15 +241,9 @@ export default async function MatchPage({
     isExtraTime: Boolean(match.isExtraTime),
     isPenaltyShootout: Boolean(match.isPenaltyShootout),
     stats: {
-      possession: [
-        match.homePossession ?? 50,
-        match.awayPossession ?? 50,
-      ] as [number, number],
+      possession: [match.homePossession ?? 50, match.awayPossession ?? 50] as [number, number],
       shots: [match.homeShots ?? 0, match.awayShots ?? 0] as [number, number],
-      shotsOnTarget: [
-        match.homeShotsOnTarget ?? 0,
-        match.awayShotsOnTarget ?? 0,
-      ] as [number, number],
+      shotsOnTarget: [match.homeShotsOnTarget ?? 0, match.awayShotsOnTarget ?? 0] as [number, number],
       corners: [match.homeCorners ?? 0, match.awayCorners ?? 0] as [number, number],
       fouls: [match.homeFouls ?? 0, match.awayFouls ?? 0] as [number, number],
       offsides: [match.homeOffsides ?? 0, match.awayOffsides ?? 0] as [number, number],
@@ -258,10 +252,7 @@ export default async function MatchPage({
       throwIns: [match.homeThrowIns ?? 0, match.awayThrowIns ?? 0] as [number, number],
       goalkicks: [match.homeGoalkicks ?? 0, match.awayGoalkicks ?? 0] as [number, number],
       penalties: [match.homePenalties ?? 0, match.awayPenalties ?? 0] as [number, number],
-      yellowCards: [
-        match.homeYellowCards ?? 0,
-        match.awayYellowCards ?? 0,
-      ] as [number, number],
+      yellowCards: [match.homeYellowCards ?? 0, match.awayYellowCards ?? 0] as [number, number],
       redCards: [match.homeRedCards ?? 0, match.awayRedCards ?? 0] as [number, number],
     },
     events: match.events.map((e) => ({
@@ -272,12 +263,8 @@ export default async function MatchPage({
       teamId: e.teamId,
       team: e.team.name,
       player: `${e.player.firstName} ${e.player.lastName}`,
-      assistPlayer: e.assistPlayer
-        ? `${e.assistPlayer.firstName} ${e.assistPlayer.lastName}`
-        : null,
-      outPlayer: e.outPlayer
-        ? `${e.outPlayer.firstName} ${e.outPlayer.lastName}`
-        : null,
+      assistPlayer: e.assistPlayer ? `${e.assistPlayer.firstName} ${e.assistPlayer.lastName}` : null,
+      outPlayer: e.outPlayer ? `${e.outPlayer.firstName} ${e.outPlayer.lastName}` : null,
     })),
     commentary: commentaryEntries.map((c) => ({
       id: c.id,
@@ -286,33 +273,27 @@ export default async function MatchPage({
     })),
     lineups: {
       home: {
-        starters: homeLineups
-          .filter((l) => l.role === "starter")
-          .map(mapLineup),
-        substitutes: homeLineups
-          .filter((l) => l.role === "substitute")
-          .map(mapLineup),
+        starters: homeLineups.filter((l) => l.role === "starter").map(mapLineup),
+        substitutes: homeLineups.filter((l) => l.role === "substitute").map(mapLineup),
       },
       away: {
-        starters: awayLineups
-          .filter((l) => l.role === "starter")
-          .map(mapLineup),
-        substitutes: awayLineups
-          .filter((l) => l.role === "substitute")
-          .map(mapLineup),
+        starters: awayLineups.filter((l) => l.role === "starter").map(mapLineup),
+        substitutes: awayLineups.filter((l) => l.role === "substitute").map(mapLineup),
       },
     },
   };
 
   return (
-    <main className="mx-auto max-w-3xl px-4 py-8">
-      <MatchCentre
-        matchId={match.id}
-        initialData={initialData}
-        h2h={h2h}
-        h2hSummary={h2hSummary}
-        h2hAdvanced={h2hAdvanced}
-      />
-    </main>
+    <div className="min-h-screen bg-slate-950 py-6 text-slate-100">
+      <main className="mx-auto max-w-4xl px-3 sm:px-6">
+        <MatchCentre
+          matchId={match.id}
+          initialData={initialData}
+          h2h={h2h}
+          h2hSummary={h2hSummary}
+          h2hAdvanced={h2hAdvanced}
+        />
+      </main>
+    </div>
   );
 }
