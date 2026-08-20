@@ -3,10 +3,11 @@ import { prisma } from "@/lib/prisma";
 
 export async function POST(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const matchId = parseInt(params.id, 10);
+    const { id } = await params;
+    const matchId = parseInt(id, 10);
     const body = await req.json();
     const { playerId, voterHash } = body ?? {};
 
