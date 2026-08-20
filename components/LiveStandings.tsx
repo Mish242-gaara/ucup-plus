@@ -28,9 +28,11 @@ type ApiStanding = {
 
 type LiveMatch = {
   id: number;
-  status: string; // "live" | "halftime" | "finished" | etc.
-  homeTeamId: number;
-  awayTeamId: number;
+  status: string;
+  homeTeamId?: number;
+  awayTeamId?: number;
+  homeTeam?: { id: number };
+  awayTeam?: { id: number };
   homeScore: number;
   awayScore: number;
 };
@@ -49,26 +51,28 @@ export default function LiveStandings({
   initialStandings: ApiStanding[];
   initialLiveMatches?: LiveMatch[];
 }) {
-  // Écoute en temps réel des classements de base & des matchs en direct
-  const standings = useRealtime<ApiStanding[]>("/api/standings", initialStandings, "standings");
-  const liveMatches = useRealtime<LiveMatch[]>("/api/matches/live", initialLiveMatches, "live-matches");
+  const standingsData = useRealtime<ApiStanding[]>("/api/standings", initialStandings, "standings");
+  const liveMatchesData = useRealtime<LiveMatch[]>("/api/matches/live", initialLiveMatches, "live-matches");
+
+  // Sécurisation au cas où l'API renvoie un objet global au lieu d'un tableau direct
+  const standings = Array.isArray(standingsData) ? standingsData : [];
+  const liveMatches = Array.isArray(liveMatchesData) ? liveMatchesData : [];
 
   const groups = Array.from(new Set(standings.map((s) => s.group ?? "—"))).sort();
 
-  // Recalcul du classement par groupe incluant les résultats en direct
   const computedGroups = useMemo(() => {
     const result: Record<string, ComputedStanding[]> = {};
 
     groups.forEach((group) => {
-      // 1. Filtrer et trier pour connaître la position de départ (officielle)
+      // 1. Filtrer et trier pour la position initiale
       const groupStandings = standings
         .filter((s) => (s.group ?? "—") === group)
         .sort((a, b) => b.points - a.points || b.goalDifference - a.goalDifference || b.goalsFor - a.goalsFor);
 
-      // Créer une copie avec la position initiale enregistrée
       const map = new Map<number, ComputedStanding>();
       groupStandings.forEach((s, idx) => {
-        map.set(s.teamId, {
+        // Conversion explicite en Number pour garantir la clé du Map
+        map.set(Number(s.teamId), {
           ...s,
           initialPosition: idx + 1,
           livePosition: idx + 1,
@@ -77,14 +81,19 @@ export default function LiveStandings({
         });
       });
 
-      // 2. Appliquer l'impact des matchs en direct
-      const activeLiveMatches = liveMatches.filter(
-        (m) => m.status === "live" || m.status === "halftime"
-      );
+      // 2. Filtrage des matchs en direct (insensible à la casse)
+      const activeLiveMatches = liveMatches.filter((m) => {
+        const st = String(m.status || "").toLowerCase();
+        return st === "live" || st === "halftime" || st === "in_play";
+      });
 
       activeLiveMatches.forEach((match) => {
-        const home = map.get(match.homeTeamId);
-        const away = map.get(match.awayTeamId);
+        // Résolution de l'ID qu'il soit à la racine ou imbriqué
+        const homeId = Number(match.homeTeamId ?? match.homeTeam?.id);
+        const awayId = Number(match.awayTeamId ?? match.awayTeam?.id);
+
+        const home = map.get(homeId);
+        const away = map.get(awayId);
 
         if (home) {
           home.isLive = true;
@@ -123,14 +132,14 @@ export default function LiveStandings({
         }
       });
 
-      // 3. Retrier selon les règles du tournoi
+      // 3. Retrier avec les scores en direct
       const sortedRows = Array.from(map.values()).sort((a, b) => {
         if (b.points !== a.points) return b.points - a.points;
         if (b.goalDifference !== a.goalDifference) return b.goalDifference - a.goalDifference;
         return b.goalsFor - a.goalsFor;
       });
 
-      // 4. Calculer la variation de position live (ex: 3ème -> 1er = +2)
+      // 4. Calcul de la variation de position
       result[group] = sortedRows.map((row, idx) => {
         const livePos = idx + 1;
         return {
@@ -152,7 +161,10 @@ export default function LiveStandings({
     );
   }
 
-  const hasAnyLive = liveMatches.some((m) => m.status === "live" || m.status === "halftime");
+  const hasAnyLive = liveMatches.some((m) => {
+    const st = String(m.status || "").toLowerCase();
+    return st === "live" || st === "halftime" || st === "in_play";
+  });
 
   return (
     <>
@@ -199,7 +211,6 @@ export default function LiveStandings({
                           s.isLive ? "bg-amber-500/10" : qualifies ? "bg-green-50/50" : eliminated ? "bg-brand-50/50" : ""
                         }`}
                       >
-                        {/* Rang & Variation */}
                         <td className="py-2.5 text-center font-bold">
                           <div className="flex items-center justify-center gap-1">
                             <span className="text-xs">{s.livePosition}</span>
@@ -215,7 +226,6 @@ export default function LiveStandings({
                           </div>
                         </td>
 
-                        {/* Équipe */}
                         <td className="py-2.5">
                           <Link href={`/teams/${s.teamId}`} className="flex items-center gap-2 hover:text-brand-500">
                             <TeamLogo
@@ -232,7 +242,6 @@ export default function LiveStandings({
                           </Link>
                         </td>
 
-                        {/* Stats */}
                         <td className="py-2.5 text-center">{s.played}</td>
                         <td className="py-2.5 text-center">{s.won}</td>
                         <td className="py-2.5 text-center">{s.drawn}</td>
