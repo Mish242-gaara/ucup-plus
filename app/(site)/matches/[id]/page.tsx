@@ -140,7 +140,7 @@ export default async function MatchPage({
     { homeWins: 0, awayWins: 0, draws: 0 }
   );
 
-  // 5. Algorithme simple de probabilités (Forme 60% + H2H 40% + Avantage domicile)
+  // 5. Algorithme de probabilités (Forme 60% + H2H 40% + Avantage domicile)
   const maxFormPoints = 15;
   const homeFormRating = homeFormPoints / maxFormPoints;
   const awayFormRating = awayFormPoints / maxFormPoints;
@@ -150,7 +150,7 @@ export default async function MatchPage({
   const awayH2HRating = totalH2H > 0 ? h2hSummary.awayWins / totalH2H : 0.33;
   const drawH2HRating = totalH2H > 0 ? h2hSummary.draws / totalH2H : 0.34;
 
-  const rawHome = homeFormRating * 0.6 + homeH2HRating * 0.4 + 0.05; // +5% domicile
+  const rawHome = homeFormRating * 0.6 + homeH2HRating * 0.4 + 0.05;
   const rawAway = awayFormRating * 0.6 + awayH2HRating * 0.4;
   const rawDraw = 0.25 + drawH2HRating * 0.15;
 
@@ -160,7 +160,7 @@ export default async function MatchPage({
   const awayWinProb = Math.round((rawAway / totalRaw) * 100);
   const drawProb = 100 - homeWinProb - awayWinProb;
 
-  // 6. Formatage des données H2H basiques
+  // 6. Formatage des données H2H
   const h2h = h2hMatches.slice(0, 5).map((m) => ({
     id: m.id,
     matchDate: m.matchDate.toISOString(),
@@ -216,6 +216,9 @@ export default async function MatchPage({
     referee: match.referee,
     homeScore: match.homeScore ?? 0,
     awayScore: match.awayScore ?? 0,
+    homeVotes: match.homeVotes ?? 0,
+    drawVotes: match.drawVotes ?? 0,
+    awayVotes: match.awayVotes ?? 0,
     homeTeam: {
       id: match.homeTeam.id,
       name: match.homeTeam.name,

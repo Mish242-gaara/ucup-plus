@@ -26,22 +26,22 @@ model User {
 }
 
 model University {
-  id          Int      @id @default(autoincrement())
-  name        String
-  shortName   String   @map("short_name")
-  logo        String?
-  colors      String?
-  address     String?  @map("address")
-  description String?
-  website     String?  @map("website")
-  contactEmail String? @map("contact_email")
-  contactPhone String? @map("contact_phone")
-  isVerified  Boolean  @default(true) @map("is_verified")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
-  city        String?
-  foundedYear Int?     @map("founded_year")
-  teams       Team[]
+  id           Int      @id @default(autoincrement())
+  name         String
+  shortName    String   @map("short_name")
+  logo         String?
+  colors       String?
+  address      String?  @map("address")
+  description  String?
+  website      String?  @map("website")
+  contactEmail String?  @map("contact_email")
+  contactPhone String?  @map("contact_phone")
+  isVerified   Boolean  @default(true) @map("is_verified")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  city         String?
+  foundedYear  Int?     @map("founded_year")
+  teams        Team[]
 
   @@map("universities")
 }
@@ -64,7 +64,7 @@ model Team {
   newsArticles NewsArticle[]
   players      Player[]      @relation("TeamPlayers")
   standings    Standing[]
-  captain      Player?       @relation("TeamCaptain", fields: [captainId], references: [id])
+  captain      Player?       @relation("TeamCaptain", fields: [captainId], references: [id], onDelete: SetNull)
   university   University    @relation(fields: [universityId], references: [id], onDelete: Cascade)
 
   @@map("teams")
@@ -107,6 +107,10 @@ model Player {
   matchLineups      MatchLineup[]
   team              Team          @relation("TeamPlayers", fields: [teamId], references: [id], onDelete: Cascade)
   captainOfTeam     Team?         @relation("TeamCaptain")
+
+  // Relations for Man of the Match feature
+  manOfMatchAwards  Match[]       @relation("MatchManOfMatch")
+  motmVotes         MotmVote[]
 
   @@map("players")
 }
@@ -173,15 +177,21 @@ model Match {
   updatedAt                DateTime          @updatedAt @map("updated_at")
   bracketPosition          Int?              @map("bracket_position")
   bracketRound             Int?              @map("bracket_round")
+  homeVotes                Int               @default(0) @map("home_votes")
+  drawVotes                Int               @default(0) @map("draw_votes")
+  awayVotes                Int               @default(0) @map("away_votes")
   lineups                  Lineup[]
   commentary               MatchCommentary[]
   events                   MatchEvent[]
   matchLineups             MatchLineup[]
   awayTeam                 Team              @relation("AwayTeam", fields: [awayTeamId], references: [id], onDelete: Cascade)
   homeTeam                 Team              @relation("HomeTeam", fields: [homeTeamId], references: [id], onDelete: Cascade)
-  homeVotes                Int               @default(0)
-  drawVotes                Int               @default(0)
-  awayVotes                Int               @default(0)
+
+  // Man of the Match fields
+  manOfMatchId             Int?              @map("man_of_match_id")
+  manOfMatch               Player?           @relation("MatchManOfMatch", fields: [manOfMatchId], references: [id], onDelete: SetNull)
+  motmVotes                MotmVote[]
+
   @@map("matches")
 }
 
@@ -198,9 +208,9 @@ model MatchEvent {
   description    String?
   createdAt      DateTime       @default(now()) @map("created_at")
   updatedAt      DateTime       @updatedAt @map("updated_at")
-  assistPlayer   Player?        @relation("EventAssist", fields: [assistPlayerId], references: [id])
+  assistPlayer   Player?        @relation("EventAssist", fields: [assistPlayerId], references: [id], onDelete: SetNull)
   match          Match          @relation(fields: [matchId], references: [id], onDelete: Cascade)
-  outPlayer      Player?        @relation("EventOutPlayer", fields: [outPlayerId], references: [id])
+  outPlayer      Player?        @relation("EventOutPlayer", fields: [outPlayerId], references: [id], onDelete: SetNull)
   player         Player         @relation("EventPlayer", fields: [playerId], references: [id], onDelete: Cascade)
   team           Team           @relation(fields: [teamId], references: [id], onDelete: Cascade)
 
@@ -369,6 +379,21 @@ model Announcement {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("announcements")
+}
+
+// Model for Player of the Match votes
+model MotmVote {
+  id        Int      @id @default(autoincrement())
+  matchId   Int      @map("match_id")
+  playerId  Int      @map("player_id")
+  voterHash String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  match  Match  @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@unique([matchId, voterHash])
+  @@map("motm_votes")
 }
 
 model Poll {

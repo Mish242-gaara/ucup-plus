@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { Trophy, LayoutGrid, List } from "lucide-react";
 import { useRealtime } from "@/lib/hooks/useRealtime";
@@ -28,7 +28,7 @@ export type LiveData = {
   awayScore: number;
   homeTeam: { name: string; logo: string | null; formation: string | null; compositionReady: boolean };
   awayTeam: { name: string; logo: string | null; formation: string | null; compositionReady: boolean };
-  formattedTime: string;
+  formattedTime: string; // Ex: "45:00" ou "12:30"
   isPaused: boolean;
   isExtraTime: boolean;
   isPenaltyShootout: boolean;
@@ -108,6 +108,66 @@ const STAT_LABELS: { key: string; label: string; suffix?: string }[] = [
   { key: "offsides", label: "Hors-jeu" },
   { key: "saves", label: "Arrêts" },
 ];
+
+/**
+ * Composant pour gérer l'affichage et l'incrémentation dynamique du chrono
+ */
+function LiveMatchTimer({
+  status,
+  formattedTime,
+  isPaused,
+}: {
+  status: string;
+  formattedTime: string;
+  isPaused: boolean;
+}) {
+  const [time, setTime] = useState(formattedTime);
+
+  // Synchronise le state local à chaque mise à jour venant du WebSocket/serveur
+  useEffect(() => {
+    setTime(formattedTime);
+  }, [formattedTime]);
+
+  // Incrémente le temps localement chaque seconde si le match est en direct et non en pause
+  useEffect(() => {
+    if (status !== "live" || isPaused) return;
+
+    const interval = setInterval(() => {
+      setTime((prevTime) => {
+        if (!prevTime || !prevTime.includes(":")) return prevTime;
+
+        const [minsStr, secsStr] = prevTime.split(":");
+        let mins = parseInt(minsStr, 10);
+        let secs = parseInt(secsStr, 10);
+
+        if (isNaN(mins) || isNaN(secs)) return prevTime;
+
+        secs += 1;
+        if (secs >= 60) {
+          secs = 0;
+          mins += 1;
+        }
+
+        const formattedMins = String(mins).padStart(2, "0");
+        const formattedSecs = String(secs).padStart(2, "0");
+
+        return `${formattedMins}:${formattedSecs}`;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [status, isPaused]);
+
+  if (status === "finished") return <span>Terminé</span>;
+  if (status === "scheduled") return <span>À venir</span>;
+
+  return (
+    <span>
+      {time}
+      {isPaused ? " (pause)" : ""}
+    </span>
+  );
+}
 
 function StatBar({ label, home, away, suffix = "" }: { label: string; home: number; away: number; suffix?: string }) {
   const total = home + away || 1;
@@ -304,7 +364,6 @@ export default function MatchCentre({
   initialData,
   h2h = [],
   h2hSummary = { homeWins: 0, awayWins: 0, draws: 0 },
-  h2hAdvanced,
 }: MatchCentreProps) {
   const data = useRealtime<LiveData>(`/api/matches/${matchId}/live`, initialData, `match-${matchId}`);
   const searchParams = useSearchParams();
@@ -330,7 +389,6 @@ export default function MatchCentre({
 
   return (
     <div className="overflow-hidden rounded-2xl bg-zinc-950 shadow-2xl">
-      {/* Header */}
       <div className="bg-gradient-to-r from-brand-800 via-brand-600 to-brand-700 px-6 py-4 text-center text-white">
         <div className="mx-auto flex max-w-md items-center justify-center gap-3">
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10">
@@ -347,7 +405,6 @@ export default function MatchCentre({
         </div>
       </div>
 
-      {/* Tabs */}
       <div className="flex justify-center gap-1 overflow-x-auto border-b border-white/10 bg-zinc-900 px-4">
         {TABS.map((t) => (
           <button
@@ -368,14 +425,13 @@ export default function MatchCentre({
         {tab === "Scores" && (
           <div>
             <div className="flex items-center justify-center gap-2 text-sm font-semibold text-gray-300">
-              {isLive && <span className="h-2 w-2 animate-pulse rounded-full bg-live" />}
-              <span>
-                {data.status === "finished"
-                  ? "Terminé"
-                  : data.status === "scheduled"
-                    ? "À venir"
-                    : `${data.formattedTime}${data.isPaused ? " (pause)" : ""}`}
-              </span>
+              {isLive && <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />}
+              {/* Composant Chrono dynamique ici */}
+              <LiveMatchTimer
+                status={data.status}
+                formattedTime={data.formattedTime}
+                isPaused={data.isPaused}
+              />
               {data.isExtraTime && <span className="text-brand-400">· Prolongation</span>}
               {data.isPenaltyShootout && <span className="text-brand-400">· Tirs au but</span>}
             </div>
