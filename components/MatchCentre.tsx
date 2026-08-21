@@ -2,7 +2,19 @@
 
 import { useState, useEffect } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
-import { Trophy, LayoutGrid, List, MapPin, UserCheck, Flame, Scale } from "lucide-react";
+import {
+  Trophy,
+  LayoutGrid,
+  List,
+  MapPin,
+  UserCheck,
+  Flame,
+  Scale,
+  Award,
+  Volume2,
+  TrendingUp,
+  ThumbsUp,
+} from "lucide-react";
 import { useRealtime } from "@/lib/hooks/useRealtime";
 import TeamLogo from "@/components/TeamLogo";
 
@@ -26,6 +38,10 @@ export type LiveData = {
   referee: string | null;
   homeScore: number;
   awayScore: number;
+  homeVotes?: number;
+  drawVotes?: number;
+  awayVotes?: number;
+  audioSummaryUrl?: string | null;
   homeTeam: { name: string; logo: string | null; formation: string | null; compositionReady: boolean };
   awayTeam: { name: string; logo: string | null; formation: string | null; compositionReady: boolean };
   formattedTime: string;
@@ -183,15 +199,15 @@ function StatBar({ label, home, away, suffix = "" }: { label: string; home: numb
           {home}
           {suffix}
         </span>
-        <span className="text-gray-400">{label}</span>
+        <span className="text-zinc-400">{label}</span>
         <span>
           {away}
           {suffix}
         </span>
       </div>
-      <div className="mt-1.5 flex h-1.5 overflow-hidden rounded-full bg-white/10">
-        <div className="bg-brand-500 transition-all duration-300" style={{ width: `${homePct}%` }} />
-        <div className="bg-white/40 transition-all duration-300" style={{ width: `${100 - homePct}%` }} />
+      <div className="mt-1.5 flex h-1.5 overflow-hidden rounded-full bg-zinc-800">
+        <div className="bg-red-600 transition-all duration-300" style={{ width: `${homePct}%` }} />
+        <div className="bg-zinc-600 transition-all duration-300" style={{ width: `${100 - homePct}%` }} />
       </div>
     </div>
   );
@@ -211,23 +227,23 @@ function LineupColumn({
     <div>
       <h3 className="font-semibold text-white">{teamName}</h3>
       {starters.length === 0 ? (
-        <p className="mt-2 text-sm text-gray-500">Composition non publiée.</p>
+        <p className="mt-2 text-sm text-zinc-500">Composition non publiée.</p>
       ) : (
         <ul className="mt-3 space-y-1.5 text-sm">
           {starters.map((p) => (
-            <li key={p.playerId} className="flex justify-between text-gray-200">
+            <li key={p.playerId} className="flex justify-between border-b border-zinc-800/50 py-1 text-zinc-200">
               <span>
                 #{p.jerseyNumber} {p.playerName}
               </span>
-              <span className="text-gray-500">{p.position}</span>
+              <span className="text-zinc-500">{p.position}</span>
             </li>
           ))}
         </ul>
       )}
       {substitutes.length > 0 && (
         <>
-          <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-gray-500">Remplaçants</p>
-          <ul className="mt-2 space-y-1 text-sm text-gray-400">
+          <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-zinc-500">Remplaçants</p>
+          <ul className="mt-2 space-y-1 text-sm text-zinc-400">
             {substitutes.map((p) => (
               <li key={p.playerId}>
                 #{p.jerseyNumber} {p.playerName}
@@ -240,20 +256,31 @@ function LineupColumn({
   );
 }
 
-function PlayerNode({ player }: { player: LineupEntry }) {
+function PlayerNode({ player, events = [] }: { player: LineupEntry; events?: LiveData["events"] }) {
   const nameParts = player.playerName.trim().split(" ");
   const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1] : nameParts[0];
 
+  const playerEvents = events.filter((e) => e.player === player.playerName);
+  const goals = playerEvents.filter((e) => e.eventType.includes("goal")).length;
+  const yellowCard = playerEvents.some((e) => e.eventType === "yellow_card");
+  const redCard = playerEvents.some((e) => e.eventType === "red_card" || e.eventType === "second_yellow");
+
   return (
     <div className="group flex flex-col items-center">
-      <div className="relative flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-white/20 bg-slate-800 shadow-md transition-transform group-hover:scale-110 sm:h-10 sm:w-10">
+      <div className="relative flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-white/20 bg-zinc-800 shadow-md transition-transform group-hover:scale-110 sm:h-10 sm:w-10">
         {player.photoUrl ? (
           <img src={player.photoUrl} alt={player.playerName} className="h-full w-full object-cover" />
         ) : (
-          <span className="text-xs font-bold text-slate-300">
+          <span className="text-xs font-bold text-zinc-300">
             {player.playerName.charAt(0).toUpperCase()}
           </span>
         )}
+
+        <div className="absolute -top-1 -right-1 flex gap-0.5">
+          {goals > 0 && <span className="text-[10px]">⚽{goals > 1 ? goals : ""}</span>}
+          {yellowCard && <span className="h-2.5 w-1.5 rounded-sm bg-amber-400" />}
+          {redCard && <span className="h-2.5 w-1.5 rounded-sm bg-rose-600" />}
+        </div>
       </div>
 
       <div className="-mt-1.5 z-10 flex items-center gap-1 rounded-full border border-white/10 bg-black/85 px-2 py-0.5 shadow-lg backdrop-blur">
@@ -271,11 +298,13 @@ function DualFacingPitch({
   awayTeam,
   homeStarters = [],
   awayStarters = [],
+  events = [],
 }: {
   homeTeam: { name: string; formation: string | null };
   awayTeam: { name: string; formation: string | null };
   homeStarters: LineupEntry[];
   awayStarters: LineupEntry[];
+  events?: LiveData["events"];
 }) {
   const parseFormation = (f: string | null) =>
     f && f.includes("-") ? f.split("-").map(Number) : [4, 3, 3];
@@ -305,24 +334,18 @@ function DualFacingPitch({
   });
 
   return (
-    <div className="relative mx-auto w-full max-w-lg overflow-hidden rounded-2xl border border-slate-700/50 bg-[#0b181f] p-4 shadow-2xl">
-      <div className="absolute inset-0 bg-[radial-gradient(#1e3a8a_1px,transparent_1px)] [background-size:20px_20px] opacity-10" />
+    <div className="relative mx-auto w-full max-w-lg overflow-hidden rounded-2xl border border-zinc-800 bg-[#0c1411] p-4 shadow-2xl">
+      <div className="absolute inset-0 bg-[radial-gradient(#16a34a_1px,transparent_1px)] [background-size:24px_24px] opacity-10" />
 
-      <div className="pointer-events-none absolute top-0 left-1/2 h-20 w-44 -translate-x-1/2 rounded-b-xl border border-t-0 border-slate-500/30 bg-slate-500/5" />
-      <div className="pointer-events-none absolute top-0 left-1/2 h-8 w-20 -translate-x-1/2 rounded-b-md border border-t-0 border-slate-500/30" />
-      <div className="pointer-events-none absolute top-20 left-1/2 h-10 w-24 -translate-x-1/2 rounded-b-full border border-slate-500/20" />
-
-      <div className="pointer-events-none absolute top-1/2 left-0 w-full border-t border-slate-500/40" />
-      <div className="pointer-events-none absolute top-1/2 left-1/2 h-28 w-28 -translate-x-1/2 -translate-y-1/2 rounded-full border border-slate-500/40" />
-
-      <div className="pointer-events-none absolute bottom-0 left-1/2 h-20 w-44 -translate-x-1/2 rounded-t-xl border border-b-0 border-slate-500/30 bg-slate-500/5" />
-      <div className="pointer-events-none absolute bottom-0 left-1/2 h-8 w-20 -translate-x-1/2 rounded-t-md border border-b-0 border-slate-500/30" />
-      <div className="pointer-events-none absolute bottom-20 left-1/2 h-10 w-24 -translate-x-1/2 rounded-t-full border border-slate-500/20" />
+      <div className="pointer-events-none absolute top-0 left-1/2 h-20 w-44 -translate-x-1/2 rounded-b-xl border border-t-0 border-emerald-500/20 bg-emerald-500/5" />
+      <div className="pointer-events-none absolute top-1/2 left-0 w-full border-t border-emerald-500/20" />
+      <div className="pointer-events-none absolute top-1/2 left-1/2 h-28 w-28 -translate-x-1/2 -translate-y-1/2 rounded-full border border-emerald-500/20" />
+      <div className="pointer-events-none absolute bottom-0 left-1/2 h-20 w-44 -translate-x-1/2 rounded-t-xl border border-b-0 border-emerald-500/20 bg-emerald-500/5" />
 
       <div className="relative z-10 flex min-h-[700px] flex-col justify-between py-2 sm:min-h-[780px]">
         <div className="flex flex-col justify-between space-y-4">
           <div className="flex justify-center">
-            {homeKeeper && <PlayerNode player={homeKeeper} />}
+            {homeKeeper && <PlayerNode player={homeKeeper} events={events} />}
           </div>
           {homeRows.map((row, rIdx) => {
             const isLastRow = rIdx === homeRows.length - 1;
@@ -332,7 +355,7 @@ function DualFacingPitch({
                 className={`flex items-center justify-around px-2 ${isLastRow ? "mb-8 sm:mb-10" : ""}`}
               >
                 {row.map((p) => (
-                  <PlayerNode key={p.playerId} player={p} />
+                  <PlayerNode key={p.playerId} player={p} events={events} />
                 ))}
               </div>
             );
@@ -341,7 +364,7 @@ function DualFacingPitch({
 
         <div className="flex flex-col-reverse justify-between space-y-4 space-y-reverse">
           <div className="flex justify-center">
-            {awayKeeper && <PlayerNode player={awayKeeper} />}
+            {awayKeeper && <PlayerNode player={awayKeeper} events={events} />}
           </div>
           {awayRows.map((row, rIdx) => {
             const isLastRow = rIdx === awayRows.length - 1;
@@ -351,7 +374,7 @@ function DualFacingPitch({
                 className={`flex items-center justify-around px-2 ${isLastRow ? "mt-8 sm:mt-10" : ""}`}
               >
                 {row.map((p) => (
-                  <PlayerNode key={p.playerId} player={p} />
+                  <PlayerNode key={p.playerId} player={p} events={events} />
                 ))}
               </div>
             );
@@ -391,6 +414,16 @@ export default function MatchCentre({
   const [tab, setTab] = useState<(typeof TABS)[number]>("Scores");
   const [lineupViewMode, setLineupViewMode] = useState<"pitch" | "list">("pitch");
 
+  const [userVote, setUserVote] = useState<"home" | "draw" | "away" | null>(null);
+  const [votes, setVotes] = useState({
+    home: data.homeVotes ?? 10,
+    draw: data.drawVotes ?? 4,
+    away: data.awayVotes ?? 6,
+  });
+
+  const [mvpVotes, setMvpVotes] = useState<Record<number, number>>({});
+  const [votedMvp, setVotedMvp] = useState<number | null>(null);
+
   useEffect(() => {
     const tabParam = searchParams.get("tab");
     if (tabParam && TAB_PARAM[tabParam]) {
@@ -403,6 +436,18 @@ export default function MatchCentre({
     const params = new URLSearchParams(searchParams.toString());
     params.set("tab", REVERSE_TAB_PARAM[selectedTab]);
     router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  };
+
+  const handleVote = (choice: "home" | "draw" | "away") => {
+    if (userVote) return;
+    setUserVote(choice);
+    setVotes((prev) => ({ ...prev, [choice]: prev[choice] + 1 }));
+  };
+
+  const handleMvpVote = (playerId: number) => {
+    if (votedMvp) return;
+    setVotedMvp(playerId);
+    setMvpVotes((prev) => ({ ...prev, [playerId]: (prev[playerId] || 0) + 1 }));
   };
 
   const isLive = data.status === "live" || data.status === "halftime";
@@ -419,10 +464,12 @@ export default function MatchCentre({
   const awaySubstitutes = data.lineups?.away?.substitutes ?? [];
 
   const totalH2H = h2hSummary.homeWins + h2hSummary.draws + h2hSummary.awayWins;
+  const totalVotes = votes.home + votes.draw + votes.away || 1;
+  const allPlayers = [...homeStarters, ...awayStarters];
 
   return (
-    <div className="overflow-hidden rounded-2xl bg-zinc-950 shadow-2xl">
-      <div className="bg-gradient-to-r from-brand-800 via-brand-600 to-brand-700 px-6 py-4 text-center text-white">
+    <div className="overflow-hidden rounded-2xl bg-zinc-950 shadow-2xl border border-zinc-800">
+      <div className="bg-gradient-to-r from-red-700 via-zinc-900 to-zinc-900 px-6 py-4 text-center text-white">
         <div className="mx-auto flex max-w-md items-center justify-center gap-3">
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10">
             <Trophy size={18} />
@@ -431,14 +478,14 @@ export default function MatchCentre({
             <p className="text-lg font-extrabold uppercase tracking-wide">
               {isLive ? "Direct Live" : data.status === "finished" ? "Match terminé" : "À venir"}
             </p>
-            <p className="text-xs uppercase tracking-widest text-brand-100">
+            <p className="text-xs uppercase tracking-widest text-zinc-300">
               {data.round ?? (data.group ? `Groupe ${data.group}` : "UCUP 2026")}
             </p>
           </div>
         </div>
 
         {(data.venue || data.referee) && (
-          <div className="mt-2 flex items-center justify-center gap-4 text-xs text-brand-100/80">
+          <div className="mt-2 flex items-center justify-center gap-4 text-xs text-zinc-400">
             {data.venue && (
               <span className="flex items-center gap-1">
                 <MapPin size={12} /> {data.venue}
@@ -453,15 +500,15 @@ export default function MatchCentre({
         )}
       </div>
 
-      <div className="flex justify-center gap-1 overflow-x-auto border-b border-white/10 bg-zinc-900 px-4">
+      <div className="flex justify-center gap-1 overflow-x-auto border-b border-zinc-800 bg-zinc-900 px-4">
         {TABS.map((t) => (
           <button
             key={t}
             onClick={() => handleTabChange(t)}
             className={
               tab === t
-                ? "border-b-2 border-brand-500 px-4 py-3 text-sm font-bold uppercase tracking-wide text-white whitespace-nowrap"
-                : "px-4 py-3 text-sm font-semibold uppercase tracking-wide text-gray-500 hover:text-gray-300 whitespace-nowrap"
+                ? "border-b-2 border-red-600 px-4 py-3 text-sm font-bold uppercase tracking-wide text-white whitespace-nowrap"
+                : "px-4 py-3 text-sm font-semibold uppercase tracking-wide text-zinc-400 hover:text-zinc-200 whitespace-nowrap"
             }
           >
             {t}
@@ -471,19 +518,19 @@ export default function MatchCentre({
 
       <div className="p-6">
         {tab === "Scores" && (
-          <div>
-            <div className="flex items-center justify-center gap-2 text-sm font-semibold text-gray-300">
+          <div className="space-y-6">
+            <div className="flex items-center justify-center gap-2 text-sm font-semibold text-zinc-300">
               {isLive && <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />}
               <LiveMatchTimer
                 status={data.status}
                 formattedTime={data.formattedTime}
                 isPaused={data.isPaused}
               />
-              {data.isExtraTime && <span className="text-brand-400">· Prolongation</span>}
-              {data.isPenaltyShootout && <span className="text-brand-400">· Tirs au but</span>}
+              {data.isExtraTime && <span className="text-red-500">· Prolongation</span>}
+              {data.isPenaltyShootout && <span className="text-red-500">· Tirs au but</span>}
             </div>
 
-            <div className="mt-4 grid grid-cols-3 items-center gap-4">
+            <div className="grid grid-cols-3 items-center gap-4">
               <div className="flex flex-col items-center gap-2 text-center">
                 <TeamLogo name={data.homeTeam.name} logo={data.homeTeam.logo} size={56} />
                 <p className="text-sm font-semibold text-white">{data.homeTeam.name}</p>
@@ -497,7 +544,7 @@ export default function MatchCentre({
               </div>
             </div>
 
-            <div className="mt-6 grid grid-cols-2 gap-4 text-xs text-gray-400">
+            <div className="grid grid-cols-2 gap-4 text-xs text-zinc-400">
               <ul className="space-y-1">
                 {homeScorers.map((e) => (
                   <li key={e.id}>
@@ -513,11 +560,105 @@ export default function MatchCentre({
                 ))}
               </ul>
             </div>
+
+            {data.audioSummaryUrl && (
+              <div className="flex items-center justify-between rounded-xl border border-zinc-800 bg-zinc-900/80 p-3">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-red-600 text-white">
+                    <Volume2 size={18} />
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-white">Résumé audio & commentaire</p>
+                    <p className="text-[10px] text-zinc-400">Écoutez le bilan vocal du match</p>
+                  </div>
+                </div>
+                <audio controls src={data.audioSummaryUrl} className="h-8 w-48 sm:w-64" />
+              </div>
+            )}
+
+            <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4 space-y-2">
+              <div className="flex items-center justify-between text-xs font-semibold text-zinc-300">
+                <span className="flex items-center gap-1.5">
+                  <TrendingUp size={14} className="text-red-500" /> Pression du match (Momentum)
+                </span>
+              </div>
+              <div className="flex h-12 items-center justify-between gap-1 rounded-lg bg-zinc-950 p-2">
+                {[40, -20, 60, 80, -40, -70, 30, 90, 10].map((v, i) => (
+                  <div key={i} className="flex h-full w-full flex-col justify-center items-center">
+                    <div
+                      style={{ height: `${Math.abs(v)}%` }}
+                      className={`w-full rounded-sm ${v > 0 ? "bg-red-500" : "bg-zinc-600"}`}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4 space-y-3">
+              <p className="flex items-center gap-1.5 text-xs font-semibold text-zinc-300">
+                <ThumbsUp size={14} className="text-amber-400" /> Vote des supporters (Qui va gagner ?)
+              </p>
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  onClick={() => handleVote("home")}
+                  className={`rounded-lg py-2 text-xs font-bold transition-colors ${
+                    userVote === "home" ? "bg-red-600 text-white" : "bg-zinc-800 text-zinc-300 hover:bg-zinc-700"
+                  }`}
+                >
+                  {data.homeTeam.name} ({Math.round((votes.home / totalVotes) * 100)}%)
+                </button>
+                <button
+                  onClick={() => handleVote("draw")}
+                  className={`rounded-lg py-2 text-xs font-bold transition-colors ${
+                    userVote === "draw" ? "bg-zinc-600 text-white" : "bg-zinc-800 text-zinc-300 hover:bg-zinc-700"
+                  }`}
+                >
+                  Nul ({Math.round((votes.draw / totalVotes) * 100)}%)
+                </button>
+                <button
+                  onClick={() => handleVote("away")}
+                  className={`rounded-lg py-2 text-xs font-bold transition-colors ${
+                    userVote === "away" ? "bg-red-600 text-white" : "bg-zinc-800 text-zinc-300 hover:bg-zinc-700"
+                  }`}
+                >
+                  {data.awayTeam.name} ({Math.round((votes.away / totalVotes) * 100)}%)
+                </button>
+              </div>
+            </div>
+
+            {data.status === "finished" && allPlayers.length > 0 && (
+              <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4 space-y-3">
+                <p className="flex items-center gap-1.5 text-xs font-semibold text-amber-400">
+                  <Award size={16} /> Élire l&apos;homme du match (MVP)
+                </p>
+                <div className="flex gap-2 overflow-x-auto pb-1">
+                  {allPlayers.map((p) => (
+                    <button
+                      key={p.playerId}
+                      onClick={() => handleMvpVote(p.playerId)}
+                      className={`flex shrink-0 items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-medium ${
+                        votedMvp === p.playerId
+                          ? "border-amber-400 bg-amber-400/10 text-amber-400"
+                          : "border-zinc-800 bg-zinc-950 text-zinc-300 hover:border-zinc-700"
+                      }`}
+                    >
+                      <span>#{p.jerseyNumber}</span>
+                      <span>{p.playerName}</span>
+                      {mvpVotes[p.playerId] && (
+                        <span className="rounded bg-amber-400/20 px-1 text-[10px] text-amber-300">
+                          +{mvpVotes[p.playerId]}
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
         {tab === "Stats" && (
-          <div className="divide-y divide-white/5">
+          <div className="divide-y divide-zinc-800">
             {STAT_LABELS.map(({ key, label, suffix }) => (
               <StatBar
                 key={key}
@@ -538,7 +679,7 @@ export default function MatchCentre({
         {tab === "Résumé" && (
           <ul className="space-y-3">
             {events.length === 0 && (data.commentary ?? []).length === 0 && (
-              <p className="text-sm text-gray-500">Aucun événement pour le moment.</p>
+              <p className="text-sm text-zinc-500">Aucun événement pour le moment.</p>
             )}
             {[
               ...events.map((e) => ({
@@ -558,25 +699,25 @@ export default function MatchCentre({
               .map((item) =>
                 item.kind === "event" ? (
                   <li key={`e-${item.data.id}`} className="flex items-center gap-3 text-sm">
-                    <span className="w-10 shrink-0 text-gray-500">
+                    <span className="w-10 shrink-0 text-zinc-500">
                       {item.data.minute}
                       {item.data.additionalTime ? `+${item.data.additionalTime}` : ""}&apos;
                     </span>
                     <span>{EVENT_ICON[item.data.eventType] ?? "•"}</span>
-                    <span className="text-gray-200">
+                    <span className="text-zinc-200">
                       <span className="font-medium text-white">{item.data.player}</span>
                       {item.data.assistPlayer && (
-                        <span className="text-gray-500"> (passe : {item.data.assistPlayer})</span>
+                        <span className="text-zinc-500"> (passe : {item.data.assistPlayer})</span>
                       )}
-                      {item.data.outPlayer && <span className="text-gray-500"> ↔ {item.data.outPlayer}</span>}
-                      <span className="ml-2 text-gray-500">— {item.data.team}</span>
+                      {item.data.outPlayer && <span className="text-zinc-500"> ↔ {item.data.outPlayer}</span>}
+                      <span className="ml-2 text-zinc-500">— {item.data.team}</span>
                     </span>
                   </li>
                 ) : (
                   <li key={`c-${item.data.id}`} className="flex items-start gap-3 text-sm">
-                    <span className="w-10 shrink-0 text-gray-500">{item.data.minute}&apos;</span>
-                    <span className="text-gray-400">💬</span>
-                    <span className="italic text-gray-300">{item.data.text}</span>
+                    <span className="w-10 shrink-0 text-zinc-500">{item.data.minute}&apos;</span>
+                    <span className="text-zinc-400">💬</span>
+                    <span className="italic text-zinc-300">{item.data.text}</span>
                   </li>
                 )
               )}
@@ -586,15 +727,15 @@ export default function MatchCentre({
         {tab === "Face-à-face" && (
           <div className="space-y-6">
             {h2hAdvanced && (
-              <div className="rounded-xl border border-white/10 bg-zinc-900/60 p-4 space-y-4">
-                <div className="flex items-center justify-between text-xs text-gray-400">
+              <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4 space-y-4">
+                <div className="flex items-center justify-between text-xs text-zinc-400">
                   <span className="flex items-center gap-1.5 font-semibold text-white">
                     <Flame size={14} className="text-amber-500" /> Forme récente
                   </span>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-medium text-gray-300">{data.homeTeam.name}</span>
+                    <span className="text-xs font-medium text-zinc-300">{data.homeTeam.name}</span>
                     <div className="flex gap-1">
                       {h2hAdvanced.homeForm.recent.map((r, i) => (
                         <FormBadge key={i} result={r} />
@@ -607,12 +748,12 @@ export default function MatchCentre({
                         <FormBadge key={i} result={r} />
                       ))}
                     </div>
-                    <span className="text-xs font-medium text-gray-300">{data.awayTeam.name}</span>
+                    <span className="text-xs font-medium text-zinc-300">{data.awayTeam.name}</span>
                   </div>
                 </div>
 
-                <div className="pt-2 border-t border-white/5 space-y-1.5">
-                  <div className="flex items-center justify-between text-xs text-gray-400">
+                <div className="pt-2 border-t border-zinc-800 space-y-1.5">
+                  <div className="flex items-center justify-between text-xs text-zinc-400">
                     <span className="flex items-center gap-1 font-semibold text-white">
                       <Scale size={14} className="text-blue-400" /> Probabilité de victoire
                     </span>
@@ -622,7 +763,7 @@ export default function MatchCentre({
                     <div style={{ width: `${h2hAdvanced.probabilities.draw}%` }} className="bg-zinc-500" />
                     <div style={{ width: `${h2hAdvanced.probabilities.awayWin}%` }} className="bg-blue-500" />
                   </div>
-                  <div className="flex justify-between text-[11px] font-medium text-gray-400">
+                  <div className="flex justify-between text-[11px] font-medium text-zinc-400">
                     <span>{h2hAdvanced.probabilities.homeWin}%</span>
                     <span>Nul {h2hAdvanced.probabilities.draw}%</span>
                     <span>{h2hAdvanced.probabilities.awayWin}%</span>
@@ -632,9 +773,9 @@ export default function MatchCentre({
             )}
 
             {totalH2H === 0 && h2h.length === 0 ? (
-              <div className="rounded-xl border border-white/5 bg-zinc-900/50 py-10 text-center">
+              <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 py-10 text-center">
                 <p className="text-base font-semibold text-white">Premier affrontement direct</p>
-                <p className="mt-1 text-xs text-gray-400">
+                <p className="mt-1 text-xs text-zinc-400">
                   {data.homeTeam.name} et {data.awayTeam.name} ne se sont encore jamais affrontées en compétition.
                 </p>
               </div>
@@ -643,15 +784,15 @@ export default function MatchCentre({
                 <div className="flex items-center justify-around text-center text-sm">
                   <div>
                     <p className="text-3xl font-extrabold text-white">{h2hSummary.homeWins}</p>
-                    <p className="mt-1 text-xs font-medium text-gray-400">{data.homeTeam.name}</p>
+                    <p className="mt-1 text-xs font-medium text-zinc-400">{data.homeTeam.name}</p>
                   </div>
                   <div>
-                    <p className="text-3xl font-extrabold text-gray-400">{h2hSummary.draws}</p>
-                    <p className="mt-1 text-xs font-medium text-gray-400">Nuls</p>
+                    <p className="text-3xl font-extrabold text-zinc-400">{h2hSummary.draws}</p>
+                    <p className="mt-1 text-xs font-medium text-zinc-400">Nuls</p>
                   </div>
                   <div>
                     <p className="text-3xl font-extrabold text-white">{h2hSummary.awayWins}</p>
-                    <p className="mt-1 text-xs font-medium text-gray-400">{data.awayTeam.name}</p>
+                    <p className="mt-1 text-xs font-medium text-zinc-400">{data.awayTeam.name}</p>
                   </div>
                 </div>
 
@@ -673,7 +814,7 @@ export default function MatchCentre({
                 )}
 
                 <div className="mt-6 space-y-2">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
                     Historique des confrontations
                   </p>
                   {h2h.map((m) => (
@@ -681,7 +822,7 @@ export default function MatchCentre({
                       key={m.id}
                       className="flex items-center justify-between rounded-lg bg-zinc-900/80 px-4 py-3 text-sm transition-colors hover:bg-zinc-900"
                     >
-                      <span className="text-xs text-gray-400">
+                      <span className="text-xs text-zinc-400">
                         {new Date(m.matchDate).toLocaleDateString("fr-FR", {
                           day: "2-digit",
                           month: "short",
@@ -702,11 +843,11 @@ export default function MatchCentre({
         {tab === "Compositions" && (
           <div className="space-y-6">
             <div className="flex items-center justify-end">
-              <div className="flex items-center gap-1 rounded-lg bg-black/40 p-1">
+              <div className="flex items-center gap-1 rounded-lg bg-zinc-900 p-1 border border-zinc-800">
                 <button
                   onClick={() => setLineupViewMode("pitch")}
                   className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold ${
-                    lineupViewMode === "pitch" ? "bg-brand-500 text-white" : "text-gray-400 hover:text-white"
+                    lineupViewMode === "pitch" ? "bg-red-600 text-white" : "text-zinc-400 hover:text-white"
                   }`}
                 >
                   <LayoutGrid size={14} />
@@ -715,7 +856,7 @@ export default function MatchCentre({
                 <button
                   onClick={() => setLineupViewMode("list")}
                   className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold ${
-                    lineupViewMode === "list" ? "bg-brand-500 text-white" : "text-gray-400 hover:text-white"
+                    lineupViewMode === "list" ? "bg-red-600 text-white" : "text-zinc-400 hover:text-white"
                   }`}
                 >
                   <List size={14} />
@@ -726,10 +867,10 @@ export default function MatchCentre({
 
             {lineupViewMode === "pitch" ? (
               homeStarters.length === 0 && awayStarters.length === 0 ? (
-                <p className="py-8 text-center text-sm text-gray-500">Les compositions n'ont pas encore été publiées.</p>
+                <p className="py-8 text-center text-sm text-zinc-500">Les compositions n'ont pas encore été publiées.</p>
               ) : (
                 <div className="space-y-6">
-                  <div className="flex items-center justify-between px-2 text-xs font-semibold text-gray-400">
+                  <div className="flex items-center justify-between px-2 text-xs font-semibold text-zinc-400">
                     <span>
                       {data.homeTeam.name} ({data.homeTeam.formation ?? "4-3-3"})
                     </span>
@@ -743,20 +884,21 @@ export default function MatchCentre({
                     awayTeam={data.awayTeam}
                     homeStarters={homeStarters}
                     awayStarters={awayStarters}
+                    events={events}
                   />
 
                   <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="rounded-xl border border-white/5 bg-zinc-900/60 p-4">
-                      <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-400">
+                    <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4">
+                      <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-zinc-400">
                         Remplaçants — {data.homeTeam.name}
                       </p>
-                      <div className="grid grid-cols-1 gap-2 text-sm text-gray-300">
+                      <div className="grid grid-cols-1 gap-2 text-sm text-zinc-300">
                         {homeSubstitutes.length === 0 ? (
-                          <p className="text-xs text-gray-500">Aucun remplaçant renseigné.</p>
+                          <p className="text-xs text-zinc-500">Aucun remplaçant renseigné.</p>
                         ) : (
                           homeSubstitutes.map((p) => (
                             <div key={p.playerId} className="flex items-center gap-2">
-                              <span className="flex h-5 w-5 items-center justify-center rounded bg-white/10 text-[10px] font-bold text-gray-300">
+                              <span className="flex h-5 w-5 items-center justify-center rounded bg-zinc-800 text-[10px] font-bold text-zinc-300">
                                 #{p.jerseyNumber}
                               </span>
                               <span className="truncate">{p.playerName}</span>
@@ -766,17 +908,17 @@ export default function MatchCentre({
                       </div>
                     </div>
 
-                    <div className="rounded-xl border border-white/5 bg-zinc-900/60 p-4">
-                      <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-400">
+                    <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4">
+                      <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-zinc-400">
                         Remplaçants — {data.awayTeam.name}
                       </p>
-                      <div className="grid grid-cols-1 gap-2 text-sm text-gray-300">
+                      <div className="grid grid-cols-1 gap-2 text-sm text-zinc-300">
                         {awaySubstitutes.length === 0 ? (
-                          <p className="text-xs text-gray-500">Aucun remplaçant renseigné.</p>
+                          <p className="text-xs text-zinc-500">Aucun remplaçant renseigné.</p>
                         ) : (
                           awaySubstitutes.map((p) => (
                             <div key={p.playerId} className="flex items-center gap-2">
-                              <span className="flex h-5 w-5 items-center justify-center rounded bg-white/10 text-[10px] font-bold text-gray-300">
+                              <span className="flex h-5 w-5 items-center justify-center rounded bg-zinc-800 text-[10px] font-bold text-zinc-300">
                                 #{p.jerseyNumber}
                               </span>
                               <span className="truncate">{p.playerName}</span>
@@ -792,13 +934,13 @@ export default function MatchCentre({
               <div className="grid gap-8 sm:grid-cols-2">
                 <div>
                   {data.homeTeam.formation && (
-                    <p className="mb-2 text-xs text-gray-500">Formation : {data.homeTeam.formation}</p>
+                    <p className="mb-2 text-xs text-zinc-500">Formation : {data.homeTeam.formation}</p>
                   )}
                   <LineupColumn teamName={data.homeTeam.name} data={data.lineups?.home} />
                 </div>
                 <div>
                   {data.awayTeam.formation && (
-                    <p className="mb-2 text-xs text-gray-500">Formation : {data.awayTeam.formation}</p>
+                    <p className="mb-2 text-xs text-zinc-500">Formation : {data.awayTeam.formation}</p>
                   )}
                   <LineupColumn teamName={data.awayTeam.name} data={data.lineups?.away} />
                 </div>
